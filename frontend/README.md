@@ -1,23 +1,44 @@
-# frontend · Vue 3 前端
+# trading-platform
 
-在此目录用 Vite 初始化 Vue 3 工程：
+This template should help get you started developing with Vue 3 in Vite.
 
-```bash
-npm create vite@latest . -- --template vue
-npm i element-plus pinia vue-router axios
+## Recommended IDE Setup
+
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+
+## Recommended Browser Setup
+
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vite.dev/config/).
+
+## Project Setup
+
+```sh
+npm install
 ```
 
-目录规划（见 docs/全栈实施方案.md 第 4 节）：
+### Compile and Hot-Reload for Development
 
-```text
-src/
-├── api/         按模块封装请求（每个函数带 mock 分支）
-├── mock/        按 docs/API接口文档.md 1:1 编写的假数据
-├── constants/   状态枚举中文映射（商品/订单/成色/纠纷）
-├── stores/      Pinia（登录态等）
-├── router/      路由 + 登录守卫
-├── utils/       request.js（Axios 实例 + 401 拦截）
-└── views/       11 个页面
+```sh
+npm run dev
 ```
 
-开发模式：`.env.development` 设 `VITE_USE_MOCK=true` 先行开发全部页面，后端就绪后关闭联调。
+### Compile and Minify for Production
+
+```sh
+npm run build
+```
+
+### Lint with [ESLint](https://eslint.org/)
+
+```sh
+npm run lint
+```
