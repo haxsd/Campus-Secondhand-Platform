@@ -511,6 +511,12 @@ export function mockUpdateProduct(id, data) {
 // 当前登录用户 id（mock 里固定是小明 id=1）。真实后端从 token 解析当前用户，前端不用传。
 const MY_USER_ID = '1'
 
+// 给其它 mock 模块（如订单）复用：按 id 拿到完整商品对象（下单要读价格/卖家/库存/快照）。
+// 返回的是内存里的同一份引用，订单 mock 扣库存时能直接改到它。
+export function findRawProduct(id) {
+  return ALL_PRODUCTS.find((p) => p.id === String(id))
+}
+
 // GET /api/products/mine —— 我的商品列表（含全部状态，status 可选筛选）
 export function mockGetMyProducts(status) {
   let mine = ALL_PRODUCTS.filter((p) => p.seller.id === MY_USER_ID)
