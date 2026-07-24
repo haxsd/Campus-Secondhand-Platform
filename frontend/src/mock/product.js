@@ -582,3 +582,30 @@ export function mockAdjustStock(id, delta) {
   p.stock = next
   return delay({ stock: next })
 }
+
+// ===== 管理端：商品审核 =====
+
+// GET /api/admin/products/pending —— 待审核商品列表（status=1）
+// 管理员看的是全站待审核商品，所以不按当前用户过滤。
+export function mockGetPendingProducts() {
+  const list = ALL_PRODUCTS.filter((p) => p.status === 1)
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return delay({ list, total: list.length })
+}
+
+// POST /api/admin/products/{id}/review —— 审核
+// data: { pass: true } 通过→在售(3)；{ pass: false, reason } 驳回→驳回(2)并记原因
+export function mockReviewProduct(id, data) {
+  const p = ALL_PRODUCTS.find((x) => x.id === String(id))
+  if (!p) return fail(404, '商品不存在')
+  if (p.status !== 1) return fail(409, '商品不在待审核状态')
+  if (data.pass) {
+    p.status = 3 // 通过 → 在售
+    p.rejectReason = undefined
+  } else {
+    p.status = 2 // 驳回 → 审核驳回
+    p.rejectReason = data.reason || ''
+  }
+  return delay(null)
+}
