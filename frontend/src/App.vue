@@ -30,7 +30,7 @@ function onCommand(command) {
   <el-container class="app-container">
     <el-header class="app-header">
       <div class="header-inner">
-        <div class="logo" @click="router.push('/')">校园二手</div>
+        <div class="logo" @click="router.push('/')">校园二手平台</div>
 
         <div class="header-right">
           <template v-if="userStore.isLoggedIn">
