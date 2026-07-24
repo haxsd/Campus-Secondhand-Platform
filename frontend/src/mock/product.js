@@ -308,6 +308,7 @@ const ALL_PRODUCTS = SEED.map((item, index) => {
     status: 3, // 3=在售（首页只展示在售商品）
     categoryId: item.categoryId,
     categoryName: CATEGORY_NAME[item.categoryId],
+    version: 1, // 乐观锁版本号：编辑提交时带上，后端比对，不一致说明数据被别处改过（返回 409）
     viewCount: 50 + ((index * 37) % 400), // 造一个稳定的浏览数（非随机，刷新不变）
     cover: images[0], // 列表卡片用第一张作封面
     images,
@@ -380,4 +381,38 @@ export function mockGetProductDetail(id) {
   const found = ALL_PRODUCTS.find((p) => p.id === String(id))
   if (!found) return fail(404, '商品不存在或已下架')
   return delay(found)
+}
+
+// POST /api/products —— 发布商品（创建草稿）
+// mock 里把新商品追加进内存数组（状态 0=草稿，首页只展示在售所以不会污染列表），返回新 id。
+export function mockCreateProduct(data) {
+  const id = String(ALL_PRODUCTS.length + 1)
+  const images = data.images?.length ? data.images : [`https://picsum.photos/seed/ct${id}/600/450`]
+  ALL_PRODUCTS.push({
+    id,
+    ...data,
+    status: 0, // 新发布默认草稿
+    version: 1,
+    viewCount: 0,
+    categoryName: CATEGORY_NAME[data.categoryId],
+    cover: images[0],
+    images,
+    seller: SELLERS.s1, // mock 里统一挂到一个卖家，联调时后端按登录用户填
+    createdAt: '2026-07-24 12:00:00',
+    recentReviews: [],
+  })
+  return delay({ id })
+}
+
+// PUT /api/products/{id} —— 编辑商品
+// mock 简化处理：找到就更新字段并返回成功；真实后端这里会校验 version 做乐观锁（不一致返回 409）。
+export function mockUpdateProduct(id, data) {
+  const found = ALL_PRODUCTS.find((p) => p.id === String(id))
+  if (!found) return fail(404, '商品不存在')
+  Object.assign(found, data, {
+    categoryName: CATEGORY_NAME[data.categoryId] ?? found.categoryName,
+    cover: data.images?.[0] ?? found.cover,
+    version: (found.version ?? 1) + 1, // 每次成功编辑版本号 +1
+  })
+  return delay(null)
 }
