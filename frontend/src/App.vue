@@ -1,23 +1,15 @@
 <script setup>
 // 全局布局组件：所有页面共用的"顶栏 + 内容区"。
-// 顶栏：Logo、搜索框、登录/注册按钮（未登录）或 发布按钮+头像下拉菜单（已登录）。
+// 顶栏：Logo、登录/注册按钮（未登录）或 发布按钮+头像下拉菜单（已登录）。
+//       （搜索统一放在首页筛选栏，顶栏不再单独放全局搜索框）
 // 内容区：<router-view> 根据当前 URL 渲染对应的页面组件。
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { logout } from '@/api/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
-const keyword = ref('')
-
-// 搜索：把关键词放进首页 URL 的 query 参数（/?keyword=xxx），
-// 首页监听该参数变化后重新拉商品列表
-function onSearch() {
-  router.push({ path: '/', query: keyword.value ? { keyword: keyword.value } : {} })
-}
 
 // 头像下拉菜单的点击处理：command 要么是路由地址（直接跳转），要么是 'logout'
 function onCommand(command) {
@@ -39,18 +31,6 @@ function onCommand(command) {
     <el-header class="app-header">
       <div class="header-inner">
         <div class="logo" @click="router.push('/')">校园二手</div>
-
-        <el-input
-          v-model="keyword"
-          class="search-input"
-          placeholder="搜索你想要的宝贝"
-          clearable
-          @keyup.enter="onSearch"
-        >
-          <template #append>
-            <el-button :icon="Search" @click="onSearch" />
-          </template>
-        </el-input>
 
         <div class="header-right">
           <template v-if="userStore.isLoggedIn">
@@ -115,10 +95,6 @@ function onCommand(command) {
   color: #409eff;
   cursor: pointer;
   white-space: nowrap;
-}
-
-.search-input {
-  max-width: 420px;
 }
 
 .header-right {

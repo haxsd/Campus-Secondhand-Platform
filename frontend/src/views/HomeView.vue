@@ -71,8 +71,8 @@ function onPageChange(p) {
   loadProducts()
 }
 
-// 监听顶栏搜索：App.vue 顶部搜索框会把关键词写进 URL（/?keyword=xxx），
-// 这里监听该参数变化，同步到本页筛选框并重新查询。
+// 监听 URL 上的 keyword 参数（/?keyword=xxx，例如外部链接/分享链接带进来），
+// 变化时同步到本页筛选框并重新查询。
 watch(
   () => route.query.keyword,
   (kw) => {
@@ -83,7 +83,7 @@ watch(
 )
 
 onMounted(async () => {
-  // 先带上 URL 里可能已有的关键词（用户从别的页面点搜索跳过来的情况）
+  // 先带上 URL 里可能已有的关键词（如外部链接 /?keyword=xxx 进来）
   filters.keyword = route.query.keyword || ''
   // 分类下拉和商品列表并行加载，页面出得更快
   const [cats] = await Promise.all([getCategories(), loadProducts()])
