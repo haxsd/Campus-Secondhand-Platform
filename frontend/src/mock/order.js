@@ -4,7 +4,8 @@ import { ElMessage } from 'element-plus'
 import { findRawProduct } from '@/mock/product'
 
 // 当前登录用户（mock 固定小明 id=1），下单时作为买家写进订单
-const CURRENT_USER = { id: '1', nickname: '小明' }
+// 导出给评价/纠纷模块判断"当前用户是不是这条订单的买家/卖家"
+export const CURRENT_USER = { id: '1', nickname: '小明' }
 
 // 订单内存表；导出给后续订单列表/详情板块复用
 export const MOCK_ORDERS = []
@@ -78,6 +79,7 @@ export function mockCreateOrder(data) {
   const order = {
     id,
     orderNo: genOrderNo(orderSeq),
+    productId: String(productId), // 记住对应商品 id，取消订单时回补库存用（后端 order 表也有 product_id）
     status: 0, // 0=待卖家确认
     quantity,
     unitPrice: product.price,
@@ -145,6 +147,7 @@ function seedOrder({
   MOCK_ORDERS.push({
     id: String(seq),
     orderNo: genOrderNo(seq),
+    productId: String(productId),
     status,
     quantity,
     unitPrice: product.price,
@@ -226,4 +229,81 @@ export function mockGetOrders(params = {}) {
   const start = (page - 1) * pageSize
   const list = filtered.slice(start, start + pageSize)
   return delay({ list, total, page, pageSize })
+}
+
+// 在内存表里按 id 找订单（导出给评价/纠纷模块复用，它们要读/改同一条订单）
+export function findOrder(id) {
+  return MOCK_ORDERS.find((o) => o.id === String(id))
+}
+
+// 计算当前登录用户对这条订单能做哪些操作（对应后端返回的 can* 字段）。
+// 真实后端会按"当前用户身份 + 订单状态"算好给前端，前端据此显示按钮，后端仍做最终校验。
+function canFlags(o) {
+  const isBuyer = o.buyer.id === CURRENT_USER.id
+  const isSeller = o.seller.id === CURRENT_USER.id
+  return {
+    canConfirm: isSeller && o.status === 0, // 卖家确认：待确认(0)
+    canCancel: (isBuyer || isSeller) && (o.status === 0 || o.status === 1), // 待确认/已确认都能取消
+    canComplete: isBuyer && o.status === 1, // 买家确认完成：已确认(1)
+    canReview: isBuyer && o.status === 2 && !o.reviewed, // 已完成且未评价
+    canDispute: (isBuyer || isSeller) && (o.status === 1 || o.status === 2) && !o.disputed, // 已确认/已完成且未发起过纠纷
+  }
+}
+
+// 往订单状态日志里追加一条流转记录
+// operatorType: 0=买家 1=卖家 2=系统 3=管理员（与后端编码一致）
+function pushLog(o, fromStatus, toStatus, operatorType, reason = null) {
+  o.logs.push({ fromStatus, toStatus, operatorType, reason, createdAt: nowStr() })
+}
+
+// 当前用户在这条订单里的操作方类型（用于写状态日志）
+function operatorTypeOf(o) {
+  return o.seller.id === CURRENT_USER.id ? 1 : 0
+}
+
+// GET /api/orders/{id} —— 订单详情（含快照、状态日志、can* 操作标记）
+export function mockGetOrderDetail(id) {
+  const o = findOrder(id)
+  if (!o) return fail(404, '订单不存在')
+  // 展开一层返回，附上 can* 标记；不直接返回内存对象引用，避免页面误改内存态
+  return delay({ ...o, ...canFlags(o) })
+}
+
+// POST /api/orders/{id}/confirm —— 卖家确认（0→1）
+export function mockConfirmOrder(id) {
+  const o = findOrder(id)
+  if (!o) return fail(404, '订单不存在')
+  // 状态机校验：只有"待卖家确认(0)"能确认，否则 409（对应后端条件更新影响行数为 0）
+  if (o.status !== 0) return fail(409, '订单状态已变化，请刷新')
+  o.status = 1
+  pushLog(o, 0, 1, 1)
+  return delay(null)
+}
+
+// POST /api/orders/{id}/cancel —— 买/卖家取消（0或1→3），并回补库存
+export function mockCancelOrder(id, reason) {
+  const o = findOrder(id)
+  if (!o) return fail(404, '订单不存在')
+  if (o.status !== 0 && o.status !== 1) return fail(409, '订单状态已变化，请刷新')
+  const from = o.status
+  o.status = 3
+  // 回补库存：把下单时扣掉的数量还给商品；若商品曾因售罄(5)下线，有货后恢复在售(3)
+  const product = findRawProduct(o.productId)
+  if (product) {
+    product.stock += o.quantity
+    if (product.status === 5 && product.stock > 0) product.status = 3
+  }
+  pushLog(o, from, 3, operatorTypeOf(o), reason || null)
+  return delay(null)
+}
+
+// POST /api/orders/{id}/complete —— 买家确认完成（1→2）
+export function mockCompleteOrder(id) {
+  const o = findOrder(id)
+  if (!o) return fail(404, '订单不存在')
+  if (o.status !== 1) return fail(409, '订单状态已变化，请刷新')
+  o.status = 2
+  o.finishedAt = nowStr()
+  pushLog(o, 1, 2, 0)
+  return delay(null)
 }
