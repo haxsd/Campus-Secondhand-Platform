@@ -6,6 +6,11 @@ import {
   mockGetProductDetail,
   mockCreateProduct,
   mockUpdateProduct,
+  mockGetMyProducts,
+  mockSubmitReview,
+  mockWithdrawReview,
+  mockOffShelf,
+  mockAdjustStock,
 } from '@/mock/product'
 
 const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -37,4 +42,34 @@ export function createProduct(data) {
 export function updateProduct(id, data) {
   if (useMock) return mockUpdateProduct(id, data)
   return put(`/products/${id}`, data)
+}
+
+// GET /api/products/mine —— 我的商品列表（含全部状态，status 可选）
+export function getMyProducts(status) {
+  if (useMock) return mockGetMyProducts(status)
+  return get('/products/mine', status ? { status } : {})
+}
+
+// POST /api/products/{id}/submit-review —— 申请上架
+export function submitReview(id) {
+  if (useMock) return mockSubmitReview(id)
+  return post(`/products/${id}/submit-review`)
+}
+
+// POST /api/products/{id}/withdraw-review —— 撤回审核申请
+export function withdrawReview(id) {
+  if (useMock) return mockWithdrawReview(id)
+  return post(`/products/${id}/withdraw-review`)
+}
+
+// POST /api/products/{id}/off-shelf —— 下架（仅在售）
+export function offShelf(id) {
+  if (useMock) return mockOffShelf(id)
+  return post(`/products/${id}/off-shelf`)
+}
+
+// POST /api/products/{id}/stock —— 在售时调库存 { delta }
+export function adjustStock(id, delta) {
+  if (useMock) return mockAdjustStock(id, delta)
+  return post(`/products/${id}/stock`, { delta })
 }

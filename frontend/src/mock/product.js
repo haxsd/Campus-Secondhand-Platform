@@ -39,6 +39,16 @@ const SELLERS = {
     avgRating: 4.5,
     goodReviewRate: 0.88,
   },
+  // s0 = 当前登录用户"小明"（mock 用户 id=1），用于"我的商品"页展示自己发布的商品
+  s0: {
+    id: '1',
+    nickname: '小明',
+    avatar: null,
+    creditScore: 100,
+    dealCount: 5,
+    avgRating: 5.0,
+    goodReviewRate: 1.0,
+  },
 }
 
 // 商品原始种子数据：只写"有区分度"的字段，其余（封面、创建时间、状态等）由下面的构建函数统一生成。
@@ -327,6 +337,87 @@ const ALL_PRODUCTS = SEED.map((item, index) => {
   }
 })
 
+// "我的商品"种子：这些商品的卖家是当前登录用户小明（seller s0，id=1），
+// 覆盖 6 种状态（0草稿/1待审核/2驳回/3在售/4已下架/5已售罄），方便"我的商品"页把各状态操作都测一遍。
+// 追加进 ALL_PRODUCTS，这样：详情页/编辑回填能查到；其中"在售"的还会出现在首页（点进去按钮显示"去管理"）。
+const MY_SEED = [
+  {
+    title: '我的 · 闲置机械键盘（草稿）',
+    categoryId: '1',
+    price: '150.00',
+    itemCondition: 2,
+    stock: 1,
+    status: 0,
+  },
+  {
+    title: '我的 · 二手显示器 24寸（待审核）',
+    categoryId: '1',
+    price: '400.00',
+    itemCondition: 2,
+    stock: 1,
+    status: 1,
+  },
+  {
+    title: '我的 · 高数教材（被驳回）',
+    categoryId: '2',
+    price: '20.00',
+    itemCondition: 3,
+    stock: 1,
+    status: 2,
+    rejectReason: '图片不清晰，请重新上传商品实拍图',
+  },
+  {
+    title: '我的 · 九成新台灯（在售）',
+    categoryId: '3',
+    price: '35.00',
+    itemCondition: 1,
+    stock: 3,
+    status: 3,
+  },
+  {
+    title: '我的 · 篮球（已下架）',
+    categoryId: '4',
+    price: '45.00',
+    itemCondition: 2,
+    stock: 1,
+    status: 4,
+  },
+  {
+    title: '我的 · 限量球鞋（已售罄）',
+    categoryId: '5',
+    price: '520.00',
+    itemCondition: 1,
+    stock: 0,
+    status: 5,
+  },
+]
+
+MY_SEED.forEach((item, i) => {
+  const id = `m${i + 1}`
+  const images = [`https://picsum.photos/seed/${id}/600/450`]
+  ALL_PRODUCTS.push({
+    id,
+    title: item.title,
+    description: '这是我发布的闲置商品（mock 演示数据）。',
+    price: item.price,
+    stock: item.stock,
+    itemCondition: item.itemCondition,
+    campus: '东校区',
+    tradePlace: '校门口菜鸟驿站',
+    status: item.status,
+    rejectReason: item.rejectReason, // 仅"审核驳回"状态有值，其余为 undefined
+    categoryId: item.categoryId,
+    categoryName: CATEGORY_NAME[item.categoryId],
+    version: 1,
+    viewCount: 10 + i,
+    cover: images[0],
+    images,
+    seller: SELLERS.s0,
+    createdAt: `2026-07-2${i} 09:00:00`,
+    recentReviews: [],
+  })
+})
+
 // 模拟网络延迟
 function delay(data, ms = 300) {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms))
@@ -415,4 +506,64 @@ export function mockUpdateProduct(id, data) {
     version: (found.version ?? 1) + 1, // 每次成功编辑版本号 +1
   })
   return delay(null)
+}
+
+// 当前登录用户 id（mock 里固定是小明 id=1）。真实后端从 token 解析当前用户，前端不用传。
+const MY_USER_ID = '1'
+
+// GET /api/products/mine —— 我的商品列表（含全部状态，status 可选筛选）
+export function mockGetMyProducts(status) {
+  let mine = ALL_PRODUCTS.filter((p) => p.seller.id === MY_USER_ID)
+  // status 传了才筛（'' 或 undefined 表示全部）
+  if (status !== undefined && status !== null && status !== '') {
+    mine = mine.filter((p) => p.status === Number(status))
+  }
+  // 按创建时间倒序
+  mine = mine.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return delay({ list: mine, total: mine.length })
+}
+
+// 小工具：找到我的某件商品，找不到就返回 404
+function findMine(id) {
+  return ALL_PRODUCTS.find((p) => p.id === String(id) && p.seller.id === MY_USER_ID)
+}
+
+// POST /api/products/{id}/submit-review —— 申请上架（草稿/驳回/已下架 且 stock>0 → 待审核）
+export function mockSubmitReview(id) {
+  const p = findMine(id)
+  if (!p) return fail(404, '商品不存在')
+  if (![0, 2, 4].includes(p.status)) return fail(409, '当前状态不能申请上架')
+  if (p.stock <= 0) return fail(409, '库存为 0，无法申请上架')
+  p.status = 1
+  p.rejectReason = undefined // 重新申请后清掉上次的驳回原因
+  return delay(null)
+}
+
+// POST /api/products/{id}/withdraw-review —— 撤回审核申请（待审核 → 草稿）
+export function mockWithdrawReview(id) {
+  const p = findMine(id)
+  if (!p) return fail(404, '商品不存在')
+  if (p.status !== 1) return fail(409, '只有待审核的商品能撤回')
+  p.status = 0
+  return delay(null)
+}
+
+// POST /api/products/{id}/off-shelf —— 下架（仅在售 → 已下架）
+export function mockOffShelf(id) {
+  const p = findMine(id)
+  if (!p) return fail(404, '商品不存在')
+  if (p.status !== 3) return fail(409, '只有在售商品能下架')
+  p.status = 4
+  return delay(null)
+}
+
+// POST /api/products/{id}/stock —— 在售时调库存 { delta }（减少后至少保留 1）
+export function mockAdjustStock(id, delta) {
+  const p = findMine(id)
+  if (!p) return fail(404, '商品不存在')
+  if (p.status !== 3) return fail(409, '只有在售商品能调整库存')
+  const next = p.stock + Number(delta)
+  if (next < 1) return fail(409, '库存减少后至少要保留 1 件')
+  p.stock = next
+  return delay({ stock: next })
 }
