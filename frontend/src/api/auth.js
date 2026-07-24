@@ -1,3 +1,6 @@
+// 认证接口层：页面只调这里的函数，不关心数据来自 mock 还是真实后端。
+// 每个函数的模式固定：useMock 为 true 走 src/mock/ 里的假数据，否则发真实 HTTP 请求。
+// 将来后端写好后，只需把 .env.development 里 VITE_USE_MOCK 改成 false 即可联调，页面代码零改动。
 import { get, post } from '@/utils/request'
 import { mockLogin, mockRegister, mockLogout, mockMe } from '@/mock/auth'
 

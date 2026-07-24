@@ -1,4 +1,5 @@
 <script setup>
+// 注册页：表单校验（含手机号/密码格式、两次密码一致）→ 调注册接口 → 跳登录页
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -27,6 +28,7 @@ const rules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     {
+      // 正则释义：(?=.*[A-Za-z]) 至少含一个字母，(?=.*\d) 至少含一个数字，.{8,20} 总长 8~20 位
       pattern: /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/,
       message: '密码 8~20 位，需同时包含字母和数字',
       trigger: 'blur',
@@ -35,6 +37,7 @@ const rules = {
   confirmPassword: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
     {
+      // 自定义校验器：和密码框的当前值对比，callback(错误) = 校验失败，callback() = 通过
       validator: (rule, value, callback) => {
         if (value !== form.password) callback(new Error('两次输入的密码不一致'))
         else callback()
@@ -50,6 +53,7 @@ async function onSubmit() {
   await formRef.value.validate()
   loading.value = true
   try {
+    // 只发送 API 文档定义的字段（confirmPassword 只是前端自检用，不传给后端）
     await register({
       studentNo: form.studentNo,
       phone: form.phone,

@@ -1,4 +1,5 @@
 <script setup>
+// 登录页：表单校验 → 调登录接口 → 把 token/用户信息存进 store → 跳回来源页面
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -16,18 +17,22 @@ const form = reactive({
   password: '',
 })
 
+// el-form 的校验规则：trigger: 'blur' 表示失去焦点时校验
 const rules = {
   account: [{ required: true, message: '请输入学号或手机号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
 async function onSubmit() {
+  // 先过前端表单校验（不通过会抛异常中断，不会发请求）
   await formRef.value.validate()
   loading.value = true
   try {
     const data = await login({ account: form.account, password: form.password })
+    // 登录态写入 Pinia + localStorage，顶栏会立刻变成头像菜单
     userStore.setLogin(data.token, data.user)
     ElMessage.success('登录成功')
+    // 如果是被守卫拦截过来的（URL 带 redirect 参数），登录后跳回原目标页
     router.push(route.query.redirect || '/')
   } catch {
     // 错误提示已由请求层统一弹出

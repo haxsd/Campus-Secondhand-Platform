@@ -1,4 +1,7 @@
 <script setup>
+// 全局布局组件：所有页面共用的"顶栏 + 内容区"。
+// 顶栏：Logo、搜索框、登录/注册按钮（未登录）或 发布按钮+头像下拉菜单（已登录）。
+// 内容区：<router-view> 根据当前 URL 渲染对应的页面组件。
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
@@ -10,13 +13,17 @@ const router = useRouter()
 const userStore = useUserStore()
 const keyword = ref('')
 
+// 搜索：把关键词放进首页 URL 的 query 参数（/?keyword=xxx），
+// 首页监听该参数变化后重新拉商品列表
 function onSearch() {
   router.push({ path: '/', query: keyword.value ? { keyword: keyword.value } : {} })
 }
 
+// 头像下拉菜单的点击处理：command 要么是路由地址（直接跳转），要么是 'logout'
 function onCommand(command) {
   if (command === 'logout') {
     ElMessageBox.confirm('确定退出登录吗？', '提示', { type: 'warning' }).then(async () => {
+      // 先通知后端使 token 失效（失败也不阻塞本地退出），再清本地登录态
       await logout().catch(() => {})
       userStore.clearLogin()
       router.push('/')
