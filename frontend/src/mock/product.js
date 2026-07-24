@@ -7,6 +7,7 @@
 
 import { ElMessage } from 'element-plus'
 import { MOCK_CATEGORIES } from './category'
+import { recordBrowse } from './history'
 
 // categoryId -> categoryName 的快速查找表，避免每条商品都手写分类名
 const CATEGORY_NAME = Object.fromEntries(MOCK_CATEGORIES.map((c) => [c.id, c.name]))
@@ -480,6 +481,8 @@ export function mockGetProducts(params = {}) {
 export function mockGetProductDetail(id) {
   const found = ALL_PRODUCTS.find((p) => p.id === String(id))
   if (!found) return fail(404, '商品不存在或已下架')
+  // 模拟"服务端在返回详情时顺手写一条浏览记录"（对齐 API 文档：写入由详情接口完成）
+  recordBrowse(found)
   return delay(found)
 }
 
@@ -609,3 +612,8 @@ export function mockReviewProduct(id, data) {
   }
   return delay(null)
 }
+
+// 种子浏览记录：预置几条在售商品，让"浏览记录"页首次进入就有内容可看（不然要先点几个详情才有）。
+ALL_PRODUCTS.filter((p) => p.status === 3)
+  .slice(0, 3)
+  .forEach((p) => recordBrowse(p))
