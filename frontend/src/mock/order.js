@@ -1,5 +1,6 @@
 // 订单模块 mock。本板块（下单）先实现"创建订单"，订单列表/详情在后续板块补。
 // 订单数据存在这个模块级数组里（内存态），刷新页面就重置——mock 的正常现象。
+import { ElMessage } from 'element-plus'
 import { findRawProduct } from '@/mock/product'
 
 // 当前登录用户（mock 固定小明 id=1），下单时作为买家写进订单
@@ -18,7 +19,13 @@ function delay(data, ms = 300) {
 }
 
 function fail(code, message) {
-  return new Promise((_, reject) => setTimeout(() => reject({ code, message, data: null }), 300))
+  // 和 request.js / 其它 mock 一致：先弹错误提示再 reject，页面 catch 不用重复弹
+  return new Promise((_, reject) =>
+    setTimeout(() => {
+      ElMessage.error(message)
+      reject({ code, message, data: null })
+    }, 300),
+  )
 }
 
 // 生成订单号：日期 + 4 位序号（和后端 orderNo 风格一致，仅用于展示）

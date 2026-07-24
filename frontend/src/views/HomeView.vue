@@ -86,8 +86,8 @@ onMounted(async () => {
   // 先带上 URL 里可能已有的关键词（用户从别的页面点搜索跳过来的情况）
   filters.keyword = route.query.keyword || ''
   // 分类下拉和商品列表并行加载，页面出得更快
-  categories.value = await getCategories()
-  loadProducts()
+  const [cats] = await Promise.all([getCategories(), loadProducts()])
+  categories.value = cats
 })
 </script>
 

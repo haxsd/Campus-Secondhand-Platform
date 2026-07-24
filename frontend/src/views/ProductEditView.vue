@@ -86,7 +86,7 @@ async function loadForEdit() {
     form.images = p.images ? [...p.images] : []
     form.version = p.version ?? 1
   } catch {
-    ElMessage.error('加载商品信息失败')
+    // 加载失败的提示已由请求层统一弹出，这里只回到"我的商品"
     router.push('/my/products')
   } finally {
     pageLoading.value = false
@@ -119,12 +119,8 @@ async function onSubmit() {
       }
       ElMessage.success('已保存为草稿，请到"我的商品"申请上架')
       router.push('/my/products')
-    } catch (e) {
-      // 409：编辑时商品已被别处修改，提示刷新后重试（乐观锁冲突）
-      if (e?.code === 409) {
-        ElMessage.warning('商品已被其他请求修改，请刷新后重试')
-      }
-      // 其他错误已由 request.js 统一弹提示，这里无需重复处理
+    } catch {
+      // 错误提示（含 409 乐观锁冲突）已由请求层统一弹出，这里无需重复处理
     } finally {
       submitting.value = false
     }

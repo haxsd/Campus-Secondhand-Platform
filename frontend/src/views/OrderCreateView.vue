@@ -59,7 +59,7 @@ async function loadProduct() {
     product.value = await getProductDetail(productId)
     form.tradePlace = product.value.tradePlace // 默认填商品的交易地点，用户可改
   } catch {
-    ElMessage.error('商品不存在或已下架')
+    // 商品不存在/已下架：报错提示已由请求层统一弹出，这里只负责跳走
     router.push('/')
   } finally {
     loading.value = false
@@ -82,14 +82,9 @@ async function onSubmit() {
       ElMessage.success('下单成功，等待卖家确认')
       router.push(`/orders/${res.id}`)
     } catch (e) {
-      // 按后端约定的错误码分别提示
-      if (e?.code === 429) {
-        ElMessage.warning('操作太频繁，请稍后再试')
-      } else if (e?.code === 409) {
-        ElMessage.warning('库存不足或商品已变化，已为你刷新商品信息')
-        loadProduct() // 刷新拿最新库存/状态
-      }
-      // 400（买自己商品）等其它错误由 request.js / mock 统一提示
+      // 错误提示（429/409/400 等）已由请求层统一弹出；
+      // 409 说明库存/商品变化，额外刷新一下拿到最新库存与状态
+      if (e?.code === 409) loadProduct()
     } finally {
       submitting.value = false
     }

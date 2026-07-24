@@ -5,6 +5,7 @@
 //   3) 列表接口只返回卡片需要的少量字段，详情接口才返回完整字段——这和真实后端一致，能少传数据；
 //   4) 封面图用 picsum.photos 的随机占位图（按 id 取种子，保证每次刷新同一商品图不变），第一版没有真实图片。
 
+import { ElMessage } from 'element-plus'
 import { MOCK_CATEGORIES } from './category'
 
 // categoryId -> categoryName 的快速查找表，避免每条商品都手写分类名
@@ -423,9 +424,15 @@ function delay(data, ms = 300) {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms))
 }
 
-// 模拟失败响应（详情查不到时用）：和 request.js 的失败处理保持一致——先 reject，页面 catch 处理
+// 模拟失败响应：和 request.js 对真实接口的处理保持一致——先弹出错误提示，再 reject，
+// 这样 mock 模式和真实模式的报错体验一致（页面 catch 里不用重复弹提示）。
 function fail(code, message) {
-  return new Promise((_, reject) => setTimeout(() => reject({ code, message, data: null }), 300))
+  return new Promise((_, reject) =>
+    setTimeout(() => {
+      ElMessage.error(message)
+      reject({ code, message, data: null })
+    }, 300),
+  )
 }
 
 // GET /api/products —— 商品列表（支持关键词/分类/校区/价格区间筛选 + 分页）
@@ -436,6 +443,8 @@ export function mockGetProducts(params = {}) {
 
   // 1) 先按各筛选条件过滤（后端 SQL 的 WHERE 在这里用 JS 模拟）
   let filtered = ALL_PRODUCTS.filter((p) => {
+    // 首页只展示"在售且有库存"的商品（草稿/待审核/驳回/已下架/已售罄都不出现在公开列表）
+    if (p.status !== 3 || p.stock <= 0) return false
     if (keyword && !p.title.includes(keyword)) return false
     if (categoryId && p.categoryId !== String(categoryId)) return false
     if (campus && p.campus !== campus) return false
@@ -488,7 +497,7 @@ export function mockCreateProduct(data) {
     categoryName: CATEGORY_NAME[data.categoryId],
     cover: images[0],
     images,
-    seller: SELLERS.s1, // mock 里统一挂到一个卖家，联调时后端按登录用户填
+    seller: SELLERS.s0, // 归属当前登录用户小明，这样发布后能在"我的商品"里看到
     createdAt: '2026-07-24 12:00:00',
     recentReviews: [],
   })
