@@ -2,7 +2,7 @@
 
 在此目录初始化 Spring Boot 3 工程（Java 17 + Maven + MyBatis）。
 
-模块规划（见 docs/全栈实施方案.md 第 4 节）：
+模块规划（见 docs/后端设计文档.md 第 2 节）：
 
 ```text
 src/main/java/com/campus/trade/

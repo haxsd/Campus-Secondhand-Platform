@@ -13,7 +13,7 @@
 ```text
 ├── backend/    Spring Boot 后端
 ├── frontend/   Vue 3 前端
-├── docs/       设计文档（实施方案 / API 契约 / 数据库设计）
+├── docs/       设计文档（前端设计 / 后端设计 / API 契约 / 数据库设计）
 └── deploy/     部署配置（docker-compose / nginx / 建表 SQL）
 ```
 
@@ -21,7 +21,7 @@
 
 - 前后端所有接口以 `docs/API接口文档.md` 为唯一契约：先改文档，再改代码。
 - 数据库结构见 `docs/数据库设计文档.md`，建表脚本 `deploy/sql/init.sql`。
-- 开发流程与里程碑见 `docs/全栈实施方案.md`。
+- 前端设计见 `docs/前端设计文档.md`，后端设计与部署见 `docs/后端设计文档.md`。
 
 ## 本地启动（开发期）
 
