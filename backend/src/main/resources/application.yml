@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: campus-trade
+  profiles:
+    # 本地默认使用 dev；部署时通过 CT_PROFILE=prod 覆盖。
+    active: ${CT_PROFILE:dev}
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${CT_SERVER_PORT:8080}
+  servlet:
+    # Controller 内不重复写 /api，统一由上下文路径添加。
+    context-path: /api
+
+mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
+  configuration:
+    # 数据库 snake_case 字段自动映射为 Java camelCase 属性。
+    map-underscore-to-camel-case: true
+    # 未知列只记录警告，便于开发期尽早发现 SQL 与实体不一致。
+    auto-mapping-unknown-column-behavior: warning
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized

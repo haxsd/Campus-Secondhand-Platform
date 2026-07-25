@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    # 所有本地参数都可以通过 CT_* 环境变量覆盖，默认值对应当前 Docker 环境。
+    url: jdbc:mysql://${CT_DB_HOST:localhost}:${CT_DB_PORT:3306}/${CT_DB_NAME:campus_trade}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${CT_DB_USERNAME:root}
+    password: ${CT_DB_PASSWORD:root123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: CampusTradeHikariPool
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 3000
+      validation-timeout: 1000
+
+campus:
+  redis:
+    host: ${CT_REDIS_HOST:localhost}
+    port: ${CT_REDIS_PORT:6379}
+    database: ${CT_REDIS_DATABASE:0}
+    password: ${CT_REDIS_PASSWORD:}
+    connect-timeout: 3s
+
+logging:
+  level:
+    com.campus.trade: debug
+    # 开发期输出 MyBatis 执行信息；生产配置应调整为 info。
+    com.campus.trade.category.mapper: debug
