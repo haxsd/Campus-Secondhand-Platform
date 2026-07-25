@@ -26,6 +26,13 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem(USER_KEY, JSON.stringify(newUser))
   }
 
+  // 个人资料保存后调用：不改变 token，只同步内存和 localStorage 中的用户展示信息。
+  // 合并而非直接覆盖，能兼容后端个人资料接口未来只返回部分可修改字段的情况。
+  function updateUser(newUser) {
+    user.value = { ...user.value, ...newUser }
+    localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+  }
+
   // 退出登录 / token 过期时调用：两边都清掉
   function clearLogin() {
     token.value = ''
@@ -34,5 +41,5 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem(USER_KEY)
   }
 
-  return { token, user, isLoggedIn, isAdmin, setLogin, clearLogin }
+  return { token, user, isLoggedIn, isAdmin, setLogin, updateUser, clearLogin }
 })

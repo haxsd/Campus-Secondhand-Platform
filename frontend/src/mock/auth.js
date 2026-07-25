@@ -82,3 +82,33 @@ export function mockMe() {
   const { password: _pwd, ...safe } = mockUsers[0]
   return delay(safe)
 }
+
+// 个人中心 mock：真实项目由 JWT 决定当前用户；演示模式固定使用第一个普通用户。
+function currentMockUser() {
+  return mockUsers[0]
+}
+
+// 返回给页面的数据与 GET /users/me 保持一致，始终排除 password。
+export function mockGetProfile() {
+  const { password: _pwd, ...safe } = currentMockUser()
+  return delay(safe)
+}
+
+// 只接受个人中心允许修改的三个展示字段，避免 mock 与真实后端的权限边界不一致。
+export function mockUpdateProfile({ nickname, campus, avatar }) {
+  const user = currentMockUser()
+  user.nickname = nickname.trim()
+  user.campus = campus.trim()
+  user.avatar = avatar || null
+  const { password: _pwd, ...safe } = user
+  return delay(safe)
+}
+
+// 模拟旧密码校验与新密码写入。真实后端还会吊销当前 token，页面会统一清理登录态。
+export function mockChangePassword({ oldPassword, newPassword }) {
+  const user = currentMockUser()
+  if (user.password !== oldPassword) return fail('当前密码错误')
+  if (user.password === newPassword) return fail('新密码不能与当前密码相同')
+  user.password = newPassword
+  return delay(null)
+}
