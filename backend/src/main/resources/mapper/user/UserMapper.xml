@@ -98,4 +98,11 @@
         INSERT INTO user_credit_summary (user_id)
         VALUES (#{userId})
     </insert>
+
+    <!-- 订单完成后只累加成交次数；平均分和好评率由评价模块完成后再单独维护。 -->
+    <update id="incrementDealCount">
+        UPDATE user_credit_summary
+        SET deal_count = deal_count + 1
+        WHERE user_id = #{userId}
+    </update>
 </mapper>

@@ -90,6 +90,22 @@ public interface ProductMapper {
             @Param("delta") Integer delta
     );
 
+    /**
+     * 买家创建订单时原子扣减库存。
+     *
+     * <p>库存判断必须写进同一条 UPDATE，不能采用“先查库存、再扣库存”，
+     * 否则两个买家同时下单时可能超卖。扣减后库存为 0 时，商品转为售罄状态。</p>
+     */
+    int decreaseStockForOrder(@Param("id") Long id, @Param("quantity") Integer quantity);
+
+    /**
+     * 订单取消时归还此前占用的库存。
+     *
+     * <p>若商品因为库存扣至 0 而变为售罄，库存恢复后同时重新标记为在售；
+     * 已软删除的商品不恢复，避免取消订单把已删除商品重新展示。</p>
+     */
+    int restoreStockForCancelledOrder(@Param("id") Long id, @Param("quantity") Integer quantity);
+
     /** 管理员审核时按“仍处于待审核”这一前置状态更新商品。 */
     int reviewByAdmin(@Param("id") Long id, @Param("targetStatus") Integer targetStatus);
 

@@ -26,7 +26,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -98,14 +97,14 @@ class ProductServiceTest {
     @Test
     void shouldRejectUpdateWhenOptimisticLockVersionDoesNotMatch() {
         UserContext.set(new CurrentUser(7L, 0, "token-7"));
-        Product existing = product(101L, 7L, ProductStatus.DRAFT.getCode());
+        Product existing = product(7L, ProductStatus.DRAFT.getCode());
         existing.setVersion(5);
         when(categoryMapper.existsEnabledById(1L)).thenReturn(true);
         when(productMapper.selectById(101L)).thenReturn(Optional.of(existing));
         // 数据库更新影响 0 行，代表另一个请求已经改变 version 或状态。
         when(productMapper.updateContentBySellerAndVersion(any(Product.class))).thenReturn(0);
 
-        assertThatThrownBy(() -> productService.update(101L, updateRequest(4)))
+        assertThatThrownBy(() -> productService.update(101L, updateRequest()))
                 .isInstanceOf(BizException.class)
                 .hasMessage("商品已被其他请求修改，请刷新后重试")
                 .extracting(exception -> ((BizException) exception).getCode())
@@ -119,7 +118,7 @@ class ProductServiceTest {
     void shouldRejectSellerOperationOnAnotherUsersProduct() {
         UserContext.set(new CurrentUser(7L, 0, "token-7"));
         when(productMapper.selectById(101L))
-                .thenReturn(Optional.of(product(101L, 8L, ProductStatus.ON_SALE.getCode())));
+                .thenReturn(Optional.of(product(8L, ProductStatus.ON_SALE.getCode())));
 
         assertThatThrownBy(() -> productService.offShelf(101L))
                 .isInstanceOf(BizException.class)
@@ -135,7 +134,7 @@ class ProductServiceTest {
         // 管理员角色通常由 AdminInterceptor 校验；Service 仍从 UserContext 获取审核人 ID 写日志。
         UserContext.set(new CurrentUser(99L, 1, "admin-token"));
         when(productMapper.selectById(101L))
-                .thenReturn(Optional.of(product(101L, 7L, ProductStatus.PENDING_REVIEW.getCode())));
+                .thenReturn(Optional.of(product(7L, ProductStatus.PENDING_REVIEW.getCode())));
         when(productMapper.reviewByAdmin(101L, ProductStatus.ON_SALE.getCode())).thenReturn(1);
 
         productService.reviewByAdmin(101L, true, null);
@@ -158,7 +157,7 @@ class ProductServiceTest {
         );
     }
 
-    private UpdateProductRequest updateRequest(int version) {
+    private UpdateProductRequest updateRequest() {
         return new UpdateProductRequest(
                 "九成新键盘",
                 "使用正常，带数据线",
@@ -169,13 +168,15 @@ class ProductServiceTest {
                 "东校区",
                 "三食堂门口",
                 List.of("/uploads/keyboard-1.jpg"),
-                version
+                // 本测试固定模拟前端拿到的旧版本号 4，用于触发乐观锁冲突。
+                4
         );
     }
 
-    private Product product(Long id, Long sellerId, int status) {
+    private Product product(Long sellerId, int status) {
         Product product = new Product();
-        product.setId(id);
+        // 本测试所有操作围绕同一个商品 ID，避免把无关变量传入辅助方法。
+        product.setId(101L);
         product.setSellerId(sellerId);
         product.setCategoryId(1L);
         product.setStatus(status);

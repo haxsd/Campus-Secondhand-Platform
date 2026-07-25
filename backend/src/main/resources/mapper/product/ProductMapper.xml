@@ -250,6 +250,34 @@
           AND deleted = 0
     </update>
 
+    <!--
+        下单扣库存使用一条条件 UPDATE 保证并发安全：status=3、库存足够且未删除才允许扣减。
+        CASE 只依据更新前库存判断；当 stock - quantity 恰好为 0 时改为售罄(5)。
+    -->
+    <update id="decreaseStockForOrder">
+        UPDATE product
+        SET stock = stock - #{quantity},
+            status = CASE WHEN stock - #{quantity} = 0 THEN 5 ELSE status END,
+            version = version + 1
+        WHERE id = #{id}
+          AND status = 3
+          AND stock &gt;= #{quantity}
+          AND deleted = 0
+    </update>
+
+    <!--
+        取消订单仅归还数量，不改变价格等商品内容。商品由售罄(5)恢复为在售(3)，
+        其他状态保持原状，避免覆盖卖家后来产生的业务状态。
+    -->
+    <update id="restoreStockForCancelledOrder">
+        UPDATE product
+        SET stock = stock + #{quantity},
+            status = CASE WHEN status = 5 THEN 3 ELSE status END,
+            version = version + 1
+        WHERE id = #{id}
+          AND deleted = 0
+    </update>
+
     <!-- 管理员审核只接受仍处于待审核状态的商品，防止已撤回的商品被旧请求审核。 -->
     <update id="reviewByAdmin">
         UPDATE product

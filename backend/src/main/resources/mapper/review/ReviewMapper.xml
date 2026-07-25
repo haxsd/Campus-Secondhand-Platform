@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd"><mapper namespace="com.campus.trade.review.mapper.ReviewMapper">
+ <select id="existsByOrderId" resultType="boolean">SELECT EXISTS(SELECT 1 FROM trade_review WHERE order_id=#{orderId})</select>
+ <insert id="insert" parameterType="com.campus.trade.review.entity.TradeReview" useGeneratedKeys="true" keyProperty="id">INSERT INTO trade_review(order_id,reviewer_id,seller_id,rating,content,tags,visible) VALUES(#{orderId},#{reviewerId},#{sellerId},#{rating},#{content},#{tags},#{visible})</insert>
+ <!-- 一次聚合更新所有信用统计，避免分别更新平均分、好评数而出现不一致。 -->
+ <update id="recalculateSellerCredit">UPDATE user_credit_summary cs JOIN (SELECT seller_id,COUNT(*) review_count,COALESCE(AVG(rating),0) avg_rating,COALESCE(AVG(rating &gt;= 4),0) good_rate,COALESCE(SUM(rating &lt;= 2),0) bad_count FROM trade_review WHERE seller_id=#{sellerId} AND visible=1 GROUP BY seller_id) r ON r.seller_id=cs.user_id SET cs.review_count=r.review_count,cs.avg_rating=r.avg_rating,cs.good_review_rate=r.good_rate,cs.bad_review_count=r.bad_count,cs.calculated_at=CURRENT_TIMESTAMP,cs.version=cs.version+1 WHERE cs.user_id=#{sellerId}</update>
+</mapper>

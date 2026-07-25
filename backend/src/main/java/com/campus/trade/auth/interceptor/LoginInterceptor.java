@@ -12,6 +12,7 @@ import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -57,9 +58,9 @@ public class LoginInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Object handler
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull Object handler
     ) throws IOException {
         // 第 1 步：先判断接口是否公开。公开不代表永远跳过认证，
         // 它只表示“没有 token 时也允许继续”；商品详情需要借此识别已登录用户并记录浏览历史。
@@ -114,16 +115,16 @@ public class LoginInterceptor implements HandlerInterceptor {
 
     @Override
     public void afterCompletion(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Object handler,
-            Exception exception
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull Object handler,
+            @NonNull Exception exception
     ) {
         // 无论业务成功还是抛异常，都必须清理 ThreadLocal，防止线程复用造成串号。
         UserContext.clear();
     }
 
-    private void writeFailure(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+    private void writeFailure(@NonNull HttpServletResponse response, @NonNull ErrorCode errorCode) throws IOException {
         // 项目 API 契约约定业务错误写在 body.code 中，因此 HTTP 状态仍返回 200。
         response.setStatus(HttpServletResponse.SC_OK);
         // 明确 UTF-8，避免中文错误信息在浏览器中乱码。

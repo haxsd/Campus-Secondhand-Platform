@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.order.mapper.OrderMapper">
+
+    <!-- 订单主表列明确列出，避免 SELECT * 在表扩展后意外影响实体映射。 -->
+    <sql id="orderColumns">
+        id, order_no, request_id, buyer_id, seller_id, product_id, quantity,
+        unit_price, total_amount, trade_time, trade_place, remark, status,
+        status_before_dispute, confirm_deadline, finished_at, created_at, updated_at
+    </sql>
+
+    <select id="selectByBuyerIdAndRequestId" resultType="com.campus.trade.order.entity.TradeOrder">
+        SELECT <include refid="orderColumns"/>
+        FROM trade_order
+        WHERE buyer_id = #{buyerId}
+          AND request_id = #{requestId}
+        LIMIT 1
+    </select>
+
+    <select id="selectById" resultType="com.campus.trade.order.entity.TradeOrder">
+        SELECT <include refid="orderColumns"/>
+        FROM trade_order
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <!-- role 只能由 Controller 校验为 buyer 或 seller，choose 避免把列名交给字符串拼接。 -->
+    <select id="selectPageByParticipant" resultType="com.campus.trade.order.entity.TradeOrder">
+        SELECT <include refid="orderColumns"/>
+        FROM trade_order
+        WHERE
+        <choose>
+            <when test="role == 'seller'">seller_id = #{userId}</when>
+            <otherwise>buyer_id = #{userId}</otherwise>
+        </choose>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countByParticipant" resultType="long">
+        SELECT COUNT(*)
+        FROM trade_order
+        WHERE
+        <choose>
+            <when test="role == 'seller'">seller_id = #{userId}</when>
+            <otherwise>buyer_id = #{userId}</otherwise>
+        </choose>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+    </select>
+
+    <insert id="insert"
+            parameterType="com.campus.trade.order.entity.TradeOrder"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO trade_order (
+            order_no, request_id, buyer_id, seller_id, product_id, quantity,
+            unit_price, total_amount, trade_time, trade_place, remark, status, confirm_deadline
+        ) VALUES (
+            #{orderNo}, #{requestId}, #{buyerId}, #{sellerId}, #{productId}, #{quantity},
+            #{unitPrice}, #{totalAmount}, #{tradeTime}, #{tradePlace}, #{remark}, #{status}, #{confirmDeadline}
+        )
+    </insert>
+
+    <insert id="insertSnapshot" parameterType="com.campus.trade.order.entity.ProductSnapshot">
+        INSERT INTO product_snapshot (
+            order_id, product_id, title, description, price, item_condition,
+            campus, trade_place, images
+        ) VALUES (
+            #{orderId}, #{productId}, #{title}, #{description}, #{price}, #{itemCondition},
+            #{campus}, #{tradePlace}, CAST(#{imagesJson} AS JSON)
+        )
+    </insert>
+
+    <!-- images 是 MySQL JSON 列；别名 images_json 后由 mapUnderscoreToCamelCase 映射到 imagesJson。 -->
+    <select id="selectSnapshotByOrderId" resultType="com.campus.trade.order.entity.ProductSnapshot">
+        SELECT id, order_id, product_id, title, description, price, item_condition,
+               campus, trade_place, images AS images_json, created_at
+        FROM product_snapshot
+        WHERE order_id = #{orderId}
+        LIMIT 1
+    </select>
+
+    <select id="selectLogsByOrderId" resultType="com.campus.trade.order.entity.TradeOrderLog">
+        SELECT id, order_id, from_status, to_status, operator_type, operator_id, reason, created_at
+        FROM trade_order_log
+        WHERE order_id = #{orderId}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
+    <insert id="insertLog" parameterType="com.campus.trade.order.entity.TradeOrderLog">
+        INSERT INTO trade_order_log (
+            order_id, from_status, to_status, operator_type, operator_id, reason
+        ) VALUES (
+            #{orderId}, #{fromStatus}, #{toStatus}, #{operatorType}, #{operatorId}, #{reason}
+        )
+    </insert>
+
+    <!-- 条件更新是订单状态机的最后一道并发保护。 -->
+    <update id="confirmBySeller">
+        UPDATE trade_order
+        SET status = 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status = 0
+    </update>
+
+    <update id="cancelByParticipant">
+        UPDATE trade_order
+        SET status = 3
+        WHERE id = #{id}
+          AND (buyer_id = #{userId} OR seller_id = #{userId})
+          AND status IN (0, 1)
+    </update>
+
+    <update id="completeByBuyer">
+        UPDATE trade_order
+        SET status = 2,
+            finished_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND buyer_id = #{buyerId}
+          AND status = 1
+    </update>
+    <update id="enterDispute">UPDATE trade_order SET status=5,status_before_dispute=#{fromStatus} WHERE id=#{id} AND (buyer_id=#{userId} OR seller_id=#{userId}) AND status=#{fromStatus}</update>
+    <update id="restoreFromDispute">UPDATE trade_order SET status=#{targetStatus},status_before_dispute=NULL WHERE id=#{id} AND status=5</update>
+    <update id="completeFromDispute">UPDATE trade_order SET status=2,status_before_dispute=NULL,finished_at=COALESCE(finished_at,CURRENT_TIMESTAMP) WHERE id=#{id} AND status=5</update>
+    <update id="cancelFromDispute">UPDATE trade_order SET status=3,status_before_dispute=NULL WHERE id=#{id} AND status=5</update>
+</mapper>

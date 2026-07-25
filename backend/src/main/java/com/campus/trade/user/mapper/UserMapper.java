@@ -50,4 +50,12 @@ public interface UserMapper {
      * @return 受影响行数，正常为 1
      */
     int insertCreditSummary(@Param("userId") Long userId);
+
+    /**
+     * 订单完成后累计卖家的成交次数。
+     *
+     * <p>只允许在订单从“已确认”成功流转到“已完成”之后调用，
+     * 否则重复点击完成按钮会造成成交数重复增加。</p>
+     */
+    int incrementDealCount(@Param("userId") Long userId);
 }
