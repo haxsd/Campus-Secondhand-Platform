@@ -7,6 +7,7 @@
     <!--
         公开接口只返回启用分类。
         sort 相同时再按主键排序，保证多次查询顺序稳定，前端列表不会随机跳动。
+        resultType 指定 MyBatis 把每一行结果映射为 Category 实体。
     -->
     <select id="selectEnabledCategories"
             resultType="com.campus.trade.category.entity.Category">

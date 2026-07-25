@@ -7,6 +7,9 @@ import java.util.List;
 
 /**
  * 商品分类持久层。
+ *
+ * <p>这里只定义方法签名，SQL 位于 CategoryMapper.xml。
+ * Mapper 不负责统一响应、权限或其他业务逻辑。</p>
  */
 @Mapper
 public interface CategoryMapper {

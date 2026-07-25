@@ -20,6 +20,9 @@ import java.util.Objects;
  *
  * <p>项目约定 HTTP 层保持成功响应，业务结果通过响应体 code 判断。
  * 未知异常只向前端返回通用文案，完整堆栈写入服务端日志，防止泄露实现细节。</p>
+ *
+ * <p>{@code @RestControllerAdvice} 会监控所有 Controller 抛出的异常，
+ * 并根据异常类型选择最匹配的 {@code @ExceptionHandler} 方法。</p>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -31,6 +34,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BizException.class)
     public Result<Void> handleBizException(BizException exception) {
+        // 业务异常可以安全地把预先设计好的 code 和 message 返回给前端。
         return Result.fail(exception.getCode(), exception.getMessage());
     }
 
@@ -79,11 +83,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleUnknownException(Exception exception) {
+        // 服务端日志保留堆栈供开发者定位，但响应不返回 SQL、类名等内部细节。
         log.error("未处理的服务端异常", exception);
         return Result.fail(ErrorCode.INTERNAL_ERROR.getCode(), ErrorCode.INTERNAL_ERROR.getMessage());
     }
 
     private String firstFieldError(org.springframework.validation.BindingResult bindingResult) {
+        // 一个请求可能同时有多个字段错误，第一版只返回第一条，避免提示过于冗长。
         return bindingResult.getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .filter(Objects::nonNull)

@@ -23,6 +23,9 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>验证顺序为 Bearer 请求头 → JWT 签名与过期时间 → Redis 白名单。
  * 三步全部通过后才把用户身份写入 UserContext。</p>
+ *
+ * <p>拦截器运行在 Controller 之前，适合处理所有受保护接口都需要执行的认证逻辑，
+ * 避免每个 Controller 都重复编写“取 token、验签、查 Redis”。</p>
  */
 @Component
 public class LoginInterceptor implements HandlerInterceptor {
@@ -41,9 +44,13 @@ public class LoginInterceptor implements HandlerInterceptor {
             LoginSessionService loginSessionService,
             ObjectMapper objectMapper
     ) {
+        // PublicRequestMatcher 判断接口是否允许匿名访问。
         this.publicRequestMatcher = publicRequestMatcher;
+        // JwtProvider 验证 token 是否由本系统签发、是否被篡改以及是否过期。
         this.jwtProvider = jwtProvider;
+        // LoginSessionService 检查 token 是否仍在 Redis 白名单中。
         this.loginSessionService = loginSessionService;
+        // 拦截器不能直接 return Result，因此使用 ObjectMapper 手动输出 JSON。
         this.objectMapper = objectMapper;
     }
 
@@ -53,10 +60,13 @@ public class LoginInterceptor implements HandlerInterceptor {
             HttpServletResponse response,
             Object handler
     ) throws IOException {
+        // 第 1 步：登录、注册和部分 GET 接口允许匿名访问，不强制要求 token。
         if (publicRequestMatcher.isPublic(request)) {
             return true;
         }
 
+        // 第 2 步：读取约定的 Authorization 请求头。
+        // 正确格式为：Authorization: Bearer eyJhbGciOi...
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (header == null || !header.startsWith(BEARER_PREFIX)) {
             writeFailure(response, ErrorCode.UNAUTHORIZED);
@@ -64,18 +74,25 @@ public class LoginInterceptor implements HandlerInterceptor {
         }
 
         try {
+            // 第 3 步：去掉 Bearer 前缀，只保留 JWT 字符串。
             String token = header.substring(BEARER_PREFIX.length()).trim();
             if (token.isEmpty()) {
                 writeFailure(response, ErrorCode.UNAUTHORIZED);
                 return false;
             }
 
+            // 第 4 步：验签、检查签发者和过期时间，并解析 userId、role、jti。
             JwtClaims claims = jwtProvider.parse(token);
+
+            // 第 5 步：查询 Redis 白名单。
+            // JWT 合法但 Redis key 已删除时，说明用户已经退出或 token 被主动吊销。
             if (!loginSessionService.isActive(claims)) {
                 writeFailure(response, ErrorCode.UNAUTHORIZED);
                 return false;
             }
 
+            // 第 6 步：把认证结果放入当前线程。
+            // 后续 Controller 和 Service 不需要再次解析 token，直接从 UserContext 获取身份。
             UserContext.set(new CurrentUser(claims.userId(), claims.role(), claims.tokenId()));
             return true;
         } catch (JwtException | IllegalArgumentException exception) {
@@ -97,7 +114,9 @@ public class LoginInterceptor implements HandlerInterceptor {
     }
 
     private void writeFailure(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+        // 项目 API 契约约定业务错误写在 body.code 中，因此 HTTP 状态仍返回 200。
         response.setStatus(HttpServletResponse.SC_OK);
+        // 明确 UTF-8，避免中文错误信息在浏览器中乱码。
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(

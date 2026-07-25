@@ -5,6 +5,8 @@ import java.time.Duration;
 /**
  * 刚签发的 token 及其 Redis 登录态所需元数据。
  *
+ * <p>前端只会收到 value；tokenId 和 ttl 是后端写入 Redis 时使用的辅助数据。</p>
+ *
  * @param value   JWT 字符串
  * @param tokenId JWT 唯一标识
  * @param ttl     剩余有效期

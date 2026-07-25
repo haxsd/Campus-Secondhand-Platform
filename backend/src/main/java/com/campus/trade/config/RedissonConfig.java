@@ -26,12 +26,18 @@ public class RedissonConfig {
      */
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient(RedisProperties properties) {
+        // Config 是 Redisson 的客户端配置对象。
         Config config = new Config();
+
+        // Redisson 地址必须包含 redis:// 协议前缀；TLS 连接则使用 rediss://。
         String address = "redis://%s:%d".formatted(properties.host(), properties.port());
 
+        // 当前 Docker 环境是单节点 Redis，因此选择 useSingleServer。
         var serverConfig = config.useSingleServer()
                 .setAddress(address)
+                // database=0 表示 Redis 第 0 号逻辑数据库。
                 .setDatabase(properties.database())
+                // 连接超时转成 Redisson API 需要的毫秒整数。
                 .setConnectTimeout(Math.toIntExact(properties.connectTimeout().toMillis()));
 
         // 本地 Redis 当前无密码；生产环境配置密码后动态提供认证信息。
@@ -41,6 +47,7 @@ public class RedissonConfig {
             );
         }
 
+        // Redisson.create 会建立连接池；destroyMethod=shutdown 会在应用关闭时释放资源。
         return Redisson.create(config);
     }
 }

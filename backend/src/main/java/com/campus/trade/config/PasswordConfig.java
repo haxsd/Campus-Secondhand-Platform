@@ -7,6 +7,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * 密码安全组件配置。
+ *
+ * <p>通过 {@code @Bean} 把 PasswordEncoder 放入 Spring 容器，
+ * AuthService 只依赖接口，不需要自己 new BCryptPasswordEncoder。</p>
  */
 @Configuration
 public class PasswordConfig {

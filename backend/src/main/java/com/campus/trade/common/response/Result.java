@@ -6,6 +6,9 @@ package com.campus.trade.common.response;
  * <p>前端响应拦截器依赖 {@code code/message/data} 三个字段：
  * code 为 0 时读取 data，其他值统一作为业务失败处理。</p>
  *
+ * <p>record 很适合只承载数据的响应对象：字段不可变，并自动生成
+ * {@code code()}、{@code message()}、{@code data()} 等读取方法。</p>
+ *
  * @param code    业务状态码，0 表示成功
  * @param message 面向用户的简短提示
  * @param data    成功时返回的业务数据，无数据时为 null

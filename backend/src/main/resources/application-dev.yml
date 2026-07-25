@@ -14,15 +14,18 @@ spring:
 
 campus:
   redis:
+    # Redis 当前运行在本机 Docker；部署后可用环境变量改成容器服务名。
     host: ${CT_REDIS_HOST:localhost}
     port: ${CT_REDIS_PORT:6379}
     database: ${CT_REDIS_DATABASE:0}
     password: ${CT_REDIS_PASSWORD:}
     connect-timeout: 3s
   jwt:
+    # issuer 会写入 JWT 的 iss，并在解析时强制核对。
     issuer: campus-trade
     # 该默认值仅用于本地开发；生产环境必须通过 CT_JWT_SECRET 设置独立随机密钥。
     secret: ${CT_JWT_SECRET:campus-trade-local-jwt-secret-change-me-2026}
+    # JWT 与 Redis 登录态使用相同有效期，默认 7 天。
     ttl: ${CT_JWT_TTL:7d}
 
 logging:

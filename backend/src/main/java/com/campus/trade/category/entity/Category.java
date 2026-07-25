@@ -8,10 +8,19 @@ package com.campus.trade.category.entity;
  */
 public class Category {
 
+    /** 分类主键。 */
     private Long id;
+
+    /** 前端展示的分类名称。 */
     private String name;
+
+    /** 排序值，数值越小越靠前。 */
     private Integer sort;
+
+    /** 是否启用：1 启用，0 停用。 */
     private Integer enabled;
+
+    // MyBatis 通过以下 setter 写入查询结果，再由 Service 通过 getter 读取。
 
     public Long getId() {
         return id;

@@ -5,6 +5,8 @@ package com.campus.trade.common.exception;
  *
  * <p>业务模块可以复用这些通用语义；如果后续需要更细的内部编号，
  * 仍需保证对外 code 与 API 文档中的 400/401/403/404/409/429/500 一致。</p>
+ *
+ * <p>注意这些是响应体中的业务码，不等同于本项目当前返回的 HTTP 状态码。</p>
  */
 public enum ErrorCode {
 
