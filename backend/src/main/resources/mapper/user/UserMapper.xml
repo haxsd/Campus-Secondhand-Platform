@@ -105,4 +105,27 @@
         SET deal_count = deal_count + 1
         WHERE user_id = #{userId}
     </update>
+
+    <!--
+        用户只能维护显示资料。SQL 中不出现 student_no、phone、role、status 等身份字段，
+        即使恶意请求额外携带了这些字段，也不会影响数据库。
+        avatar 允许为 NULL，用于用户主动清除头像并恢复默认头像。
+    -->
+    <update id="updateProfile" parameterType="com.campus.trade.user.entity.User">
+        UPDATE `user`
+        SET nickname = #{nickname},
+            avatar = #{avatar},
+            campus = #{campus}
+        WHERE id = #{id}
+    </update>
+
+    <!--
+        密码必须始终由 Service 转换为 BCrypt 哈希后才可传入此 SQL，
+        Mapper 不接收也不处理任何明文密码。
+    -->
+    <update id="updatePassword">
+        UPDATE `user`
+        SET password = #{password}
+        WHERE id = #{userId}
+    </update>
 </mapper>

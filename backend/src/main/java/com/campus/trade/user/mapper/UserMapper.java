@@ -58,4 +58,21 @@ public interface UserMapper {
      * 否则重复点击完成按钮会造成成交数重复增加。</p>
      */
     int incrementDealCount(@Param("userId") Long userId);
+
+    /**
+     * 更新用户可自行维护的公开资料。
+     *
+     * <p>学号、手机号、角色和账号状态都属于身份或安全字段，不能通过本方法修改；
+     * 防止客户端伪造请求变更登录身份或越权提升权限。</p>
+     *
+     * @return 受影响行数，正常应为 1
+     */
+    int updateProfile(User user);
+
+    /**
+     * 仅更新密码哈希值。调用方必须先完成旧密码校验和新密码 BCrypt 加密。
+     *
+     * @return 受影响行数，正常应为 1
+     */
+    int updatePassword(@Param("userId") Long userId, @Param("password") String password);
 }

@@ -45,6 +45,7 @@ function onCommand(command) {
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item command="/my/profile">个人中心</el-dropdown-item>
                   <el-dropdown-item command="/my/products">我的商品</el-dropdown-item>
                   <el-dropdown-item command="/my/orders">我的订单</el-dropdown-item>
                   <el-dropdown-item command="/my/history">浏览记录</el-dropdown-item>
