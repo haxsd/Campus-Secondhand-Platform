@@ -1,0 +1,11 @@
+package com.campus.trade.common.context;
+
+/**
+ * 当前请求通过认证后的用户身份。
+ *
+ * @param userId  用户 ID
+ * @param role    角色编码
+ * @param tokenId 当前 JWT 的 jti，退出登录时用于删除 Redis 登录态
+ */
+public record CurrentUser(Long userId, Integer role, String tokenId) {
+}

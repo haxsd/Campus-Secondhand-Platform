@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.user.mapper.UserMapper">
+
+    <!-- 登录查询明确列出字段，避免 user 表扩展后无意读取大字段。 -->
+    <sql id="userColumns">
+        id,
+        student_no,
+        phone,
+        password,
+        nickname,
+        avatar,
+        campus,
+        role,
+        status,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="selectByAccount"
+            resultType="com.campus.trade.user.entity.User">
+        SELECT
+        <include refid="userColumns"/>
+        FROM `user`
+        WHERE student_no = #{account}
+           OR phone = #{account}
+        LIMIT 1
+    </select>
+
+    <select id="selectById"
+            resultType="com.campus.trade.user.entity.User">
+        SELECT
+        <include refid="userColumns"/>
+        FROM `user`
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="existsByStudentNoOrPhone" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM `user`
+            WHERE student_no = #{studentNo}
+               OR phone = #{phone}
+        )
+    </select>
+
+    <insert id="insert"
+            parameterType="com.campus.trade.user.entity.User"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO `user` (
+            student_no,
+            phone,
+            password,
+            nickname,
+            avatar,
+            campus,
+            role,
+            status
+        )
+        VALUES (
+            #{studentNo},
+            #{phone},
+            #{password},
+            #{nickname},
+            #{avatar},
+            #{campus},
+            #{role},
+            #{status}
+        )
+    </insert>
+
+    <!-- 信用摘要采用数据库默认值初始化，避免默认分散在 Java 代码中。 -->
+    <insert id="insertCreditSummary">
+        INSERT INTO user_credit_summary (user_id)
+        VALUES (#{userId})
+    </insert>
+</mapper>

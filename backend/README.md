@@ -8,6 +8,7 @@
 - 已完成统一响应、业务异常、全局异常处理和 Long 转字符串。
 - 已连接 MySQL、Redis。
 - 已实现公开分类接口 `GET /api/categories`。
+- 已实现注册、登录、JWT + Redis 登录态、退出和当前用户接口。
 
 ## 模块结构
 
@@ -53,6 +54,8 @@ CT_REDIS_HOST
 CT_REDIS_PORT
 CT_REDIS_PASSWORD
 CT_SERVER_PORT
+CT_JWT_SECRET
+CT_JWT_TTL
 ```
 
 在 IDEA 中使用项目 JDK 17、Maven 运行 `CampusTradeApplication`，或者在已配置 Maven 的终端执行：

@@ -3,10 +3,13 @@ package com.campus.trade.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.config.Credentials;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Redisson 客户端配置。
@@ -31,9 +34,11 @@ public class RedissonConfig {
                 .setDatabase(properties.database())
                 .setConnectTimeout(Math.toIntExact(properties.connectTimeout().toMillis()));
 
-        // 本地 Redis 当前无密码；生产环境配置密码后才调用 setPassword。
+        // 本地 Redis 当前无密码；生产环境配置密码后动态提供认证信息。
         if (StringUtils.hasText(properties.password())) {
-            serverConfig.setPassword(properties.password());
+            config.setCredentialsResolver(nodeAddress ->
+                    CompletableFuture.completedFuture(new Credentials(null, properties.password()))
+            );
         }
 
         return Redisson.create(config);
