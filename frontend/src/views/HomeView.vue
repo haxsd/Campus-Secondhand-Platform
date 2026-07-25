@@ -24,7 +24,8 @@ const categories = ref([]) // 分类下拉选项，来自 GET /categories
 const list = ref([]) // 当前页商品
 const total = ref(0) // 符合筛选条件的商品总数（分页组件算总页数用）
 const page = ref(1)
-const pageSize = ref(12)
+// 首页每页展示 8 条。初始化数据较少时也能直观看到第二页，方便验证分页接口。
+const pageSize = ref(8)
 const loading = ref(false)
 
 // 拉取商品列表：把筛选条件 + 分页参数一起传给接口
@@ -41,7 +42,9 @@ async function loadProducts() {
       pageSize: pageSize.value,
     })
     list.value = data.list
-    total.value = data.total
+    // 后端为了避免 JavaScript 的长整数精度问题，会把部分数字序列化为字符串。
+    // 分页组件需要稳定的 number 类型，因此在页面入口统一转换，避免页码不显示。
+    total.value = Number(data.total) || 0
   } finally {
     // 无论成功失败都要关掉 loading，否则页面会一直转圈
     loading.value = false
@@ -140,8 +143,13 @@ onMounted(async () => {
       <el-empty v-else-if="!loading" description="没有找到符合条件的商品" />
     </div>
 
-    <!-- 分页：只有超过一页时才显示 -->
-    <div v-if="total > pageSize" class="pager">
+    <!--
+      始终在有查询结果时显示分页与总数：即使当前只有一页，用户也能知道总商品数，
+      当数据增长到多页时无需再改变页面结构。
+    -->
+    <div v-if="total > 0" class="pager">
+      <!-- 明确展示当前页和总数量，数据超过一页时可直观看到分页状态。 -->
+      <span class="pager-summary">第 {{ page }} / {{ Math.ceil(total / pageSize) }} 页，共 {{ total }} 件商品</span>
       <el-pagination
         background
         layout="prev, pager, next, total"
@@ -196,7 +204,14 @@ onMounted(async () => {
 
 .pager {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 12px;
   margin-top: 8px;
+}
+
+.pager-summary {
+  color: #606266;
+  font-size: 14px;
 }
 </style>

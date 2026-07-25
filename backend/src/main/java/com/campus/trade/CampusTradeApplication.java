@@ -2,6 +2,7 @@ package com.campus.trade;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 校园二手交易平台后端入口。
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * Controller、Service 和 Mapper，新增业务模块时不要放到根包之外。</p>
  */
 @SpringBootApplication
+@EnableScheduling
 public class CampusTradeApplication {
 
     /**

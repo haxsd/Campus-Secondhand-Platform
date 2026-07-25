@@ -32,6 +32,9 @@ function onCommand(command) {
       <div class="header-inner">
         <div class="logo" @click="router.push('/')">校园二手平台</div>
 
+        <!-- 显式首页按钮：用户进入发布、订单或管理页面后可随时返回商品首页。 -->
+        <el-button class="home-button" text @click="router.push('/')">首页</el-button>
+
         <div class="header-right">
           <template v-if="userStore.isLoggedIn">
             <el-button type="primary" @click="router.push('/publish')">发布闲置</el-button>
@@ -95,6 +98,14 @@ function onCommand(command) {
   color: #409eff;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.home-button {
+  color: #606266;
+}
+
+.home-button:hover {
+  color: #409eff;
 }
 
 .header-right {

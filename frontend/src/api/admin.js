@@ -11,6 +11,12 @@ export function getPendingProducts() {
   return get('/admin/products/pending')
 }
 
+// GET /api/admin/products/{id} —— 待审核商品完整资料，仅管理员审核详情页使用。
+export function getPendingProductDetail(id) {
+  if (useMock) return mockGetPendingProducts().then((res) => res.list.find((item) => String(item.id) === String(id)))
+  return get(`/admin/products/${id}`)
+}
+
 // POST /api/admin/products/{id}/review —— 审核商品
 // data: { pass: true } 或 { pass: false, reason }
 export function reviewProduct(id, data) {

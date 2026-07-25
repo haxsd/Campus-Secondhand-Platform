@@ -5,6 +5,7 @@ import com.campus.trade.common.response.Result;
 import com.campus.trade.product.dto.ProductReviewRequest;
 import com.campus.trade.product.service.ProductService;
 import com.campus.trade.product.vo.PendingProductVO;
+import com.campus.trade.product.vo.ProductDetailVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
@@ -39,6 +40,14 @@ public class AdminProductController {
     @GetMapping("/pending")
     public Result<PageResult<PendingProductVO>> listPending() {
         return Result.ok(productService.listPending());
+    }
+
+    /** 管理员审核前读取待审核商品完整资料，公开详情接口不会返回该状态的商品。 */
+    @GetMapping("/{id}")
+    public Result<ProductDetailVO> getPendingDetail(
+            @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
+    ) {
+        return Result.ok(productService.getPendingDetailForAdmin(id));
     }
 
     /**

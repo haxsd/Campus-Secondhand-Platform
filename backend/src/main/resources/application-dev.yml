@@ -30,6 +30,10 @@ campus:
     secret: ${CT_JWT_SECRET:campus-trade-local-jwt-secret-change-me-2026}
     # JWT 与 Redis 登录态使用相同有效期，默认 7 天。
     ttl: ${CT_JWT_TTL:7d}
+  order:
+    # 定时任务每分钟扫描一次超时待确认订单；可用环境变量临时关闭。
+    timeout-scan-enabled: ${CT_ORDER_TIMEOUT_SCAN_ENABLED:true}
+    timeout-scan-delay-ms: ${CT_ORDER_TIMEOUT_SCAN_DELAY_MS:60000}
 
 logging:
   level:

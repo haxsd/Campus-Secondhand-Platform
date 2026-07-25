@@ -54,8 +54,8 @@ public class FileStorageService {
     /**
      * 校验并保存一张商品图片。
      *
-     * <p>校验同时检查浏览器声明的 MIME 类型和文件头魔数。只检查扩展名不安全，
-     * 因为攻击者可以把任意文件改名为 .jpg；只相信 MIME 也不安全，因为请求头可伪造。</p>
+     * <p>以文件头魔数识别真实格式。浏览器上报的 MIME 类型只是客户端元数据，
+     * 在 Windows、聊天软件或图片转换工具之间可能不一致，不能据此误拒绝真实图片。</p>
      */
     public UploadFileVO storeImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -65,8 +65,8 @@ public class FileStorageService {
             throw new BizException(ErrorCode.BAD_REQUEST, "单张图片不能超过 5MB");
         }
 
+        // 文件头由服务端读取，不能靠“把文件名改成 .png”伪造；它是最终格式依据。
         ImageType imageType = detectImageType(file);
-        validateMimeType(file.getContentType(), imageType);
 
         // 完全忽略原文件名，使用 UUID 生成服务器文件名，避免路径穿越和重名覆盖。
         String savedFilename = UUID.randomUUID() + imageType.extension();
@@ -108,12 +108,6 @@ public class FileStorageService {
             throw new BizException(ErrorCode.BAD_REQUEST, "只支持 jpg、png、webp 格式的图片");
         } catch (IOException exception) {
             throw new BizException(ErrorCode.BAD_REQUEST, "无法读取上传文件");
-        }
-    }
-
-    private void validateMimeType(String contentType, ImageType imageType) {
-        if (!imageType.mimeType().equalsIgnoreCase(contentType)) {
-            throw new BizException(ErrorCode.BAD_REQUEST, "图片 MIME 类型与文件内容不一致");
         }
     }
 

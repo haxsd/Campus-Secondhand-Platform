@@ -58,7 +58,7 @@ class FileStorageServiceTest {
     }
 
     @Test
-    void shouldRejectWhenClaimedMimeDoesNotMatchFileContent() {
+    void shouldUseFileMagicInsteadOfUnreliableBrowserMimeMetadata() {
         FileStorageService storageService = storageService();
         MockMultipartFile mislabeledFile = new MockMultipartFile(
                 "file",
@@ -67,9 +67,9 @@ class FileStorageServiceTest {
                 pngHeader()
         );
 
-        assertThatThrownBy(() -> storageService.storeImage(mislabeledFile))
-                .isInstanceOf(BizException.class)
-                .hasMessage("图片 MIME 类型与文件内容不一致");
+        // 浏览器可能把真实 PNG 错报成 image/jpeg；服务端应以 PNG 文件头为准并保存为 .png。
+        UploadFileVO uploaded = storageService.storeImage(mislabeledFile);
+        assertThat(uploaded.url()).endsWith(".png");
     }
 
     private FileStorageService storageService() {

@@ -338,6 +338,26 @@ public class ProductService {
     }
 
     /**
+     * 管理员审核前读取完整资料，不使用公开详情缓存。
+     * 待审核商品不能被游客读取，审核写操作仍会再次校验状态防止旧页面误操作。
+     */
+    @Transactional(readOnly = true)
+    public ProductDetailVO getPendingDetailForAdmin(Long productId) {
+        Product product = productMapper.selectById(productId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
+        requireStatus(product, Set.of(ProductStatus.PENDING_REVIEW.getCode()), "商品已不在待审核状态");
+        SellerSummary seller = productMapper.selectSellerSummary(product.getSellerId())
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "卖家不存在"));
+        return new ProductDetailVO(
+                product.getId(), product.getTitle(), product.getDescription(), product.getPrice(), product.getStock(),
+                product.getItemCondition(), product.getCampus(), product.getTradePlace(), product.getStatus(),
+                product.getCategoryId(), productMapper.selectCategoryNameById(product.getCategoryId()), product.getViewCount(),
+                productMapper.selectImageUrlsByProductId(product.getId()), toSellerVO(seller),
+                productMapper.selectRecentReviewsBySellerId(product.getSellerId()).stream().map(this::toRecentReviewVO).toList()
+        );
+    }
+
+    /**
      * 管理员审核待审核商品：通过后上架，驳回后记录原因。
      */
     @Transactional
