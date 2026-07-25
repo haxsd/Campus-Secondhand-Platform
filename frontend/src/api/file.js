@@ -4,7 +4,7 @@ import { mockUploadFile } from '@/mock/file'
 
 const useMock = import.meta.env.VITE_USE_MOCK === 'true'
 
-// POST /api/files/upload —— 图片上传（multipart，字段名 file），返回 { url }
+// POST /api/files/upload —— 图片上传（multipart，字段名 file），真实后端返回 { url: '/api/uploads/...' }
 export function uploadFile(file) {
   if (useMock) return mockUploadFile(file)
   // 真实上传：用 FormData 以 multipart 形式发送，字段名必须是后端约定的 'file'

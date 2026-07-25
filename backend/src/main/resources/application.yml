@@ -11,6 +11,11 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
     serialization:
       write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      # Spring 在进入 Controller 前拒绝超过限制的 multipart 请求，和 FileStorageService 双重保护。
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 server:
   # 使用环境变量可让不同机器选择端口，未配置时默认 8080。

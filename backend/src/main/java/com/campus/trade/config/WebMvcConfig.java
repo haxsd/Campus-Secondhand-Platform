@@ -2,8 +2,10 @@ package com.campus.trade.config;
 
 import com.campus.trade.auth.interceptor.AdminInterceptor;
 import com.campus.trade.auth.interceptor.LoginInterceptor;
+import com.campus.trade.file.service.FileStorageService;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -17,14 +19,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final LoginInterceptor loginInterceptor;
     private final AdminInterceptor adminInterceptor;
+    private final FileStorageService fileStorageService;
 
     public WebMvcConfig(
             LoginInterceptor loginInterceptor,
-            AdminInterceptor adminInterceptor
+            AdminInterceptor adminInterceptor,
+            FileStorageService fileStorageService
     ) {
         // Spring 自动从容器中注入已经创建好的两个拦截器 Bean。
         this.loginInterceptor = loginInterceptor;
         this.adminInterceptor = adminInterceptor;
+        // 文件服务负责创建目录；MVC 配置只负责把 URL 映射到该目录。
+        this.fileStorageService = fileStorageService;
     }
 
     /**
@@ -41,5 +47,22 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(adminInterceptor)
                 .addPathPatterns("/admin/**")
                 .order(1);
+    }
+
+    /**
+     * 将上传目录中的图片映射为公开静态资源。
+     *
+     * <p>访问 /api/uploads/xxx.jpg 时，会由 Spring 读取本机上传目录中的对应文件。
+     * PublicRequestMatcher 已放行 /uploads/**，浏览器加载 img 标签时无需再携带 token。</p>
+     */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String location = fileStorageService.getUploadDirectory().toUri().toString();
+        // ResourceLocations 表示目录时必须以 / 结束，避免把 uploads 当作文件名而不是目录。
+        if (!location.endsWith("/")) {
+            location += "/";
+        }
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(location);
     }
 }

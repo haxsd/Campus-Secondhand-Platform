@@ -13,6 +13,9 @@ spring:
       validation-timeout: 1000
 
 campus:
+  file:
+    # 第一版本地上传目录；生产环境可通过环境变量改为挂载卷目录，或替换为 OSS 实现。
+    upload-dir: ${CT_UPLOAD_DIR:uploads}
   redis:
     # Redis 当前运行在本机 Docker；部署后可用环境变量改成容器服务名。
     host: ${CT_REDIS_HOST:localhost}

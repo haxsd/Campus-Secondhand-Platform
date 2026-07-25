@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.product.mapper.ProductMapper">
+
+    <!-- product 表的可复用列清单，避免 SELECT * 暴露新增字段或产生列名歧义。 -->
+    <sql id="productColumns">
+        id, seller_id, category_id, title, description, price, stock,
+        item_condition, campus, trade_place, status, view_count,
+        version, deleted, created_at, updated_at
+    </sql>
+
+    <insert id="insert"
+            parameterType="com.campus.trade.product.entity.Product"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO product (
+            seller_id, category_id, title, description, price, stock,
+            item_condition, campus, trade_place, status
+        ) VALUES (
+            #{sellerId}, #{categoryId}, #{title}, #{description}, #{price}, #{stock},
+            #{itemCondition}, #{campus}, #{tradePlace}, #{status}
+        )
+    </insert>
+
+    <!-- 编辑商品时先删旧图再批量写新图，sort 使用请求数组下标保持展示顺序。 -->
+    <delete id="deleteImagesByProductId">
+        DELETE FROM product_image
+        WHERE product_id = #{productId}
+    </delete>
+
+    <insert id="insertImages">
+        INSERT INTO product_image (product_id, url, sort)
+        VALUES
+        <foreach collection="urls" item="url" index="index" separator=",">
+            (#{productId}, #{url}, #{index})
+        </foreach>
+    </insert>
+
+    <select id="selectById" resultType="com.campus.trade.product.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        WHERE id = #{id}
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- 公开列表只允许读取在售且有库存的商品。 -->
+    <select id="selectPublicProducts"
+            parameterType="com.campus.trade.product.model.ProductSearchCriteria"
+            resultType="com.campus.trade.product.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        <where>
+            status = 3
+            AND stock &gt; 0
+            AND deleted = 0
+            <if test="keyword != null and keyword != ''">
+                AND title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="categoryId != null">
+                AND category_id = #{categoryId}
+            </if>
+            <if test="campus != null and campus != ''">
+                AND campus = #{campus}
+            </if>
+            <if test="minPrice != null">
+                AND price &gt;= #{minPrice}
+            </if>
+            <if test="maxPrice != null">
+                AND price &lt;= #{maxPrice}
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countPublicProducts"
+            parameterType="com.campus.trade.product.model.ProductSearchCriteria"
+            resultType="long">
+        SELECT COUNT(*)
+        FROM product
+        <where>
+            status = 3
+            AND stock &gt; 0
+            AND deleted = 0
+            <if test="keyword != null and keyword != ''">
+                AND title LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="categoryId != null">
+                AND category_id = #{categoryId}
+            </if>
+            <if test="campus != null and campus != ''">
+                AND campus = #{campus}
+            </if>
+            <if test="minPrice != null">
+                AND price &gt;= #{minPrice}
+            </if>
+            <if test="maxPrice != null">
+                AND price &lt;= #{maxPrice}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectPublicById" resultType="com.campus.trade.product.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        WHERE id = #{id}
+          AND status = 3
+          AND stock &gt; 0
+          AND deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- status 为空时返回卖家全部商品；不是空时再按状态筛选。 -->
+    <select id="selectBySeller" resultType="com.campus.trade.product.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        WHERE seller_id = #{sellerId}
+          AND deleted = 0
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <select id="selectPendingProducts" resultType="com.campus.trade.product.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        WHERE status = 1
+          AND deleted = 0
+        ORDER BY updated_at ASC, id ASC
+    </select>
+
+    <select id="selectImageUrlsByProductId" resultType="string">
+        SELECT url
+        FROM product_image
+        WHERE product_id = #{productId}
+        ORDER BY sort ASC, id ASC
+    </select>
+
+    <select id="selectCoverByProductId" resultType="string">
+        SELECT url
+        FROM product_image
+        WHERE product_id = #{productId}
+        ORDER BY sort ASC, id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectCategoryNameById" resultType="string">
+        SELECT name
+        FROM category
+        WHERE id = #{categoryId}
+        LIMIT 1
+    </select>
+
+    <!-- LEFT JOIN 避免历史数据缺少信用摘要时商品详情整体查询失败。 -->
+    <select id="selectSellerSummary" resultType="com.campus.trade.product.model.SellerSummary">
+        SELECT u.id,
+               u.nickname,
+               u.avatar,
+               COALESCE(cs.credit_score, 100) AS credit_score,
+               COALESCE(cs.deal_count, 0) AS deal_count,
+               COALESCE(cs.avg_rating, 0) AS avg_rating,
+               COALESCE(cs.good_review_rate, 0) AS good_review_rate
+        FROM `user` u
+        LEFT JOIN user_credit_summary cs ON cs.user_id = u.id
+        WHERE u.id = #{sellerId}
+        LIMIT 1
+    </select>
+
+    <select id="selectRecentReviewsBySellerId" resultType="com.campus.trade.product.model.ReviewSummary">
+        SELECT rating, content, created_at
+        FROM trade_review
+        WHERE seller_id = #{sellerId}
+          AND visible = 1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 5
+    </select>
+
+    <select id="selectLatestRejectReason" resultType="string">
+        SELECT reason
+        FROM product_review_log
+        WHERE product_id = #{productId}
+          AND result = 2
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <!-- version 同时出现在 WHERE 与 SET 中，构成乐观锁：只有版本匹配才会影响一行。 -->
+    <update id="updateContentBySellerAndVersion"
+            parameterType="com.campus.trade.product.entity.Product">
+        UPDATE product
+        SET category_id = #{categoryId},
+            title = #{title},
+            description = #{description},
+            price = #{price},
+            stock = #{stock},
+            item_condition = #{itemCondition},
+            campus = #{campus},
+            trade_place = #{tradePlace},
+            version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND version = #{version}
+          AND status IN (0, 2, 4)
+          AND deleted = 0
+    </update>
+
+    <update id="submitReviewBySeller">
+        UPDATE product
+        SET status = 1,
+            version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status IN (0, 2, 4)
+          AND stock &gt; 0
+          AND deleted = 0
+    </update>
+
+    <update id="withdrawReviewBySeller">
+        UPDATE product
+        SET status = 0,
+            version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status = 1
+          AND deleted = 0
+    </update>
+
+    <update id="offShelfBySeller">
+        UPDATE product
+        SET status = 4,
+            version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status = 3
+          AND deleted = 0
+    </update>
+
+    <update id="adjustStockBySeller">
+        UPDATE product
+        SET stock = stock + #{delta},
+            version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status = 3
+          AND stock + #{delta} &gt;= 1
+          AND deleted = 0
+    </update>
+
+    <!-- 管理员审核只接受仍处于待审核状态的商品，防止已撤回的商品被旧请求审核。 -->
+    <update id="reviewByAdmin">
+        UPDATE product
+        SET status = #{targetStatus},
+            version = version + 1
+        WHERE id = #{id}
+          AND status = 1
+          AND deleted = 0
+    </update>
+
+    <insert id="insertReviewLog">
+        INSERT INTO product_review_log (product_id, reviewer_id, result, reason)
+        VALUES (#{productId}, #{reviewerId}, #{result}, #{reason})
+    </insert>
+</mapper>

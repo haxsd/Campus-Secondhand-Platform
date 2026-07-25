@@ -6,7 +6,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { createProduct, updateProduct, getProductDetail } from '@/api/product'
+import { createProduct, updateProduct, getMyProducts } from '@/api/product'
 import { getCategories } from '@/api/category'
 import { ITEM_CONDITION, CAMPUS_LIST } from '@/constants'
 import ImageUploader from '@/components/ImageUploader.vue'
@@ -70,11 +70,14 @@ const rules = {
   ],
 }
 
-// 编辑模式：拉详情回填表单
+// 编辑模式：从“我的商品”中查找当前商品后回填表单。
+// 不能使用公开详情接口：草稿、待审核和驳回商品按后端规则不允许匿名公开访问。
 async function loadForEdit() {
   pageLoading.value = true
   try {
-    const p = await getProductDetail(productId.value)
+    const response = await getMyProducts()
+    const p = response.list.find((item) => String(item.id) === String(productId.value))
+    if (!p) throw new Error('商品不存在或无权编辑')
     form.title = p.title
     form.description = p.description
     form.price = Number(p.price)

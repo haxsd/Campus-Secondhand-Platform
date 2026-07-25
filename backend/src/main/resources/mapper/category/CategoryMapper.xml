@@ -19,4 +19,14 @@
         WHERE enabled = 1
         ORDER BY sort ASC, id ASC
     </select>
+
+    <!-- 发布商品前确认分类仍可用，避免向停用分类写入新商品。 -->
+    <select id="existsEnabledById" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM category
+            WHERE id = #{id}
+              AND enabled = 1
+        )
+    </select>
 </mapper>

@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Objects;
 
@@ -76,6 +77,17 @@ public class GlobalExceptionHandler {
     })
     public Result<Void> handleMalformedRequest(Exception exception) {
         return Result.fail(ErrorCode.BAD_REQUEST.getCode(), ErrorCode.BAD_REQUEST.getMessage());
+    }
+
+    /**
+     * 处理 multipart 上传超过 Spring 配置上限的情况。
+     *
+     * <p>该异常发生在 Controller 读取 MultipartFile 之前，因此 FileStorageService 无法捕获，
+     * 需要在全局异常处理器中转换为前端能识别的 400 业务码。</p>
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<Void> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException exception) {
+        return Result.fail(ErrorCode.BAD_REQUEST.getCode(), "单张图片不能超过 5MB");
     }
 
     /**

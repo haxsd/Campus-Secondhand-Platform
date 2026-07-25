@@ -80,7 +80,7 @@
 | 方法 | 路径 | 登录 | 说明 |
 | --- | --- | --- | --- |
 | GET | /api/categories | 否 | 启用中的分类列表 `[{id,name}]` |
-| POST | /api/files/upload | 是 | 图片上传（multipart，字段名 file），返回 `{ "url": "/uploads/xxx.jpg" }` |
+| POST | /api/files/upload | 是 | 图片上传（multipart，字段名 file），返回 `{ "url": "/api/uploads/xxx.jpg" }` |
 
 上传限制：jpg/png/webp，单文件 ≤ 5MB，一次一个；后端校验 MIME 与文件头，随机文件名。
 
