@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.history.mapper.BrowseHistoryMapper">
+
+    <!--
+        BrowseHistoryVO 是 Java record，没有 setter；使用 constructor 显式调用其规范构造器，
+        避免 MyBatis 尝试按 JavaBean setter 自动映射并输出未知列警告。
+    -->
+    <resultMap id="browseHistoryVOMap" type="com.campus.trade.history.vo.BrowseHistoryVO">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="product_id" javaType="java.lang.Long"/>
+            <arg column="title" javaType="java.lang.String"/>
+            <arg column="cover" javaType="java.lang.String"/>
+            <arg column="price" javaType="java.math.BigDecimal"/>
+            <arg column="item_condition" javaType="java.lang.Integer"/>
+            <arg column="campus" javaType="java.lang.String"/>
+            <arg column="last_view_time" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+        user_id + product_id 的唯一索引保证一名用户对同一商品最多一条记录。
+        ON DUPLICATE KEY UPDATE 让重复浏览只更新时间，避免先查再写带来的并发竞态。
+    -->
+    <insert id="upsert">
+        INSERT INTO browse_history (user_id, product_id, last_browsed_at)
+        VALUES (#{userId}, #{productId}, CURRENT_TIMESTAMP)
+        ON DUPLICATE KEY UPDATE last_browsed_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <!--
+        浏览记录保留已下架或售罄商品，用户可以回顾自己看过的内容；
+        软删除商品不再展示。封面使用相关子查询取第一张图片，和商品公开列表保持一致。
+    -->
+    <select id="selectPage" resultMap="browseHistoryVOMap">
+        SELECT p.id,
+               bh.product_id,
+               p.title,
+               (
+                   SELECT pi.url
+                   FROM product_image pi
+                   WHERE pi.product_id = p.id
+                   ORDER BY pi.sort ASC, pi.id ASC
+                   LIMIT 1
+               ) AS cover,
+               p.price,
+               p.item_condition,
+               p.campus,
+               bh.last_browsed_at AS last_view_time
+        FROM browse_history bh
+        INNER JOIN product p ON p.id = bh.product_id
+        WHERE bh.user_id = #{userId}
+          AND p.deleted = 0
+        ORDER BY bh.last_browsed_at DESC, bh.id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*)
+        FROM browse_history bh
+        INNER JOIN product p ON p.id = bh.product_id
+        WHERE bh.user_id = #{userId}
+          AND p.deleted = 0
+    </select>
+</mapper>

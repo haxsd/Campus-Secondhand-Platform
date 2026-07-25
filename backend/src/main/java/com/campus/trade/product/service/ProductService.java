@@ -5,6 +5,7 @@ import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.common.exception.ErrorCode;
 import com.campus.trade.common.response.PageResult;
+import com.campus.trade.history.service.BrowseHistoryService;
 import com.campus.trade.product.dto.CreateProductRequest;
 import com.campus.trade.product.dto.StockAdjustRequest;
 import com.campus.trade.product.dto.UpdateProductRequest;
@@ -24,6 +25,8 @@ import com.campus.trade.product.vo.ProductSellerVO;
 import com.campus.trade.product.vo.RecentReviewVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -52,10 +55,19 @@ public class ProductService {
 
     private final ProductMapper productMapper;
     private final CategoryMapper categoryMapper;
+    private final ProductDetailCacheService productDetailCacheService;
+    private final BrowseHistoryService browseHistoryService;
 
-    public ProductService(ProductMapper productMapper, CategoryMapper categoryMapper) {
+    public ProductService(
+            ProductMapper productMapper,
+            CategoryMapper categoryMapper,
+            ProductDetailCacheService productDetailCacheService,
+            BrowseHistoryService browseHistoryService
+    ) {
         this.productMapper = productMapper;
         this.categoryMapper = categoryMapper;
+        this.productDetailCacheService = productDetailCacheService;
+        this.browseHistoryService = browseHistoryService;
     }
 
     /**
@@ -116,6 +128,7 @@ public class ProductService {
         // 图片没有独立编辑接口，因此采用“删旧图 + 写新图”的事务性整体替换。
         productMapper.deleteImagesByProductId(productId);
         productMapper.insertImages(productId, normalizeImageUrls(request.images()));
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     /**
@@ -133,6 +146,7 @@ public class ProductService {
         if (productMapper.submitReviewBySeller(productId, sellerId) == 0) {
             throw conflict("商品状态已变化，请刷新后重试");
         }
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     /**
@@ -147,6 +161,7 @@ public class ProductService {
         if (productMapper.withdrawReviewBySeller(productId, sellerId) == 0) {
             throw conflict("商品状态已变化，请刷新后重试");
         }
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     /**
@@ -161,6 +176,7 @@ public class ProductService {
         if (productMapper.offShelfBySeller(productId, sellerId) == 0) {
             throw conflict("商品状态已变化，请刷新后重试");
         }
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     /**
@@ -183,6 +199,7 @@ public class ProductService {
         if (productMapper.adjustStockBySeller(productId, sellerId, request.delta()) == 0) {
             throw conflict("商品库存已变化，请刷新后重试");
         }
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     /**
@@ -229,13 +246,44 @@ public class ProductService {
     /**
      * 查询公开商品详情，并组合分类、卖家信用、图片和最近评价。
      */
-    @Transactional(readOnly = true)
     public ProductDetailVO getPublicDetail(Long productId) {
-        Product product = productMapper.selectPublicById(productId)
-                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在或已下架"));
+        ProductDetailCacheService.Lookup lookup = productDetailCacheService.lookup(productId);
+        ProductDetailVO detail;
+        if (lookup.hit()) {
+            detail = lookup.detail();
+        } else {
+            detail = loadPublicDetail(productId);
+            if (detail == null) {
+                productDetailCacheService.putNull(productId);
+            } else {
+                productDetailCacheService.putDetail(detail);
+            }
+        }
+
+        if (detail == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "商品不存在或已下架");
+        }
+
+        // 缓存命中时同样要记录浏览；记录行为与详情数据来自缓存还是 MySQL 无关。
+        browseHistoryService.recordIfAuthenticated(productId);
+        return detail;
+    }
+
+    /**
+     * 从 MySQL 组装公开详情。返回 null 表示商品不存在或当前不可公开展示，交由调用方写空值缓存。
+     */
+    private ProductDetailVO loadPublicDetail(Long productId) {
+        Product product = productMapper.selectPublicById(productId).orElse(null);
+        if (product == null) {
+            return null;
+        }
 
         SellerSummary seller = productMapper.selectSellerSummary(product.getSellerId())
-                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "卖家不存在"));
+                .orElse(null);
+        if (seller == null) {
+            // 数据完整性异常时不暴露半成品商品详情，也不向 Redis 写入长期正常缓存。
+            return null;
+        }
         ProductSellerVO sellerVO = toSellerVO(seller);
         List<RecentReviewVO> reviews = productMapper.selectRecentReviewsBySellerId(product.getSellerId())
                 .stream()
@@ -315,6 +363,7 @@ public class ProductService {
                 pass ? 1 : 2,
                 normalizedReason
         );
+        invalidateDetailCacheAfterCommit(productId);
     }
 
     private void validateProductForm(Integer itemCondition, Long categoryId) {
@@ -428,5 +477,21 @@ public class ProductService {
 
     private BizException conflict(String message) {
         return new BizException(ErrorCode.CONFLICT, message);
+    }
+
+    /**
+     * 在数据库事务真正提交后再删缓存，避免事务最终回滚却提前删掉仍然有效的旧缓存。
+     */
+    private void invalidateDetailCacheAfterCommit(Long productId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            productDetailCacheService.invalidate(productId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                productDetailCacheService.invalidate(productId);
+            }
+        });
     }
 }

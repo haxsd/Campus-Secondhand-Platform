@@ -20,6 +20,13 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // 兼容初始化数据中可能已经保存的旧图片地址 /uploads/xxx。
+      // 后端现在统一在 /api/uploads/** 提供静态图片，因此代理时补上 /api 前缀。
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => `/api${path}`,
+      },
     },
   },
 })

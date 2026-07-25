@@ -22,7 +22,8 @@ import java.nio.charset.StandardCharsets;
  * 登录认证拦截器。
  *
  * <p>验证顺序为 Bearer 请求头 → JWT 签名与过期时间 → Redis 白名单。
- * 三步全部通过后才把用户身份写入 UserContext。</p>
+ * 三步全部通过后才把用户身份写入 UserContext。公开接口采用“可选认证”：
+ * 没有 token 允许匿名访问；携带合法 token 时仍会识别用户身份。</p>
  *
  * <p>拦截器运行在 Controller 之前，适合处理所有受保护接口都需要执行的认证逻辑，
  * 避免每个 Controller 都重复编写“取 token、验签、查 Redis”。</p>
@@ -60,15 +61,23 @@ public class LoginInterceptor implements HandlerInterceptor {
             HttpServletResponse response,
             Object handler
     ) throws IOException {
-        // 第 1 步：登录、注册和部分 GET 接口允许匿名访问，不强制要求 token。
-        if (publicRequestMatcher.isPublic(request)) {
-            return true;
-        }
+        // 第 1 步：先判断接口是否公开。公开不代表永远跳过认证，
+        // 它只表示“没有 token 时也允许继续”；商品详情需要借此识别已登录用户并记录浏览历史。
+        boolean publicRequest = publicRequestMatcher.isPublic(request);
 
         // 第 2 步：读取约定的 Authorization 请求头。
         // 正确格式为：Authorization: Bearer eyJhbGciOi...
         String header = request.getHeader(AUTHORIZATION_HEADER);
-        if (header == null || !header.startsWith(BEARER_PREFIX)) {
+        if (header == null || header.isBlank()) {
+            // 公开请求没有 token，按匿名访问处理；受保护请求仍必须登录。
+            if (publicRequest) {
+                return true;
+            }
+            writeFailure(response, ErrorCode.UNAUTHORIZED);
+            return false;
+        }
+        if (!header.startsWith(BEARER_PREFIX)) {
+            // 已携带认证头但格式错误时统一返回 401，避免把错误 token 当匿名请求悄悄放过。
             writeFailure(response, ErrorCode.UNAUTHORIZED);
             return false;
         }
@@ -92,7 +101,8 @@ public class LoginInterceptor implements HandlerInterceptor {
             }
 
             // 第 6 步：把认证结果放入当前线程。
-            // 后续 Controller 和 Service 不需要再次解析 token，直接从 UserContext 获取身份。
+            // 后续 Controller 和 Service 不需要再次解析 token，直接从 UserContext 获取身份；
+            // 对公开详情接口而言，这一步让 BrowseHistoryService 知道本次是否需要写浏览记录。
             UserContext.set(new CurrentUser(claims.userId(), claims.role(), claims.tokenId()));
             return true;
         } catch (JwtException | IllegalArgumentException exception) {

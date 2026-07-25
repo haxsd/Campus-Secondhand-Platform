@@ -8,8 +8,10 @@ import com.campus.trade.category.entity.Category;
 import com.campus.trade.category.mapper.CategoryMapper;
 import com.campus.trade.common.context.CurrentUser;
 import com.campus.trade.common.context.UserContext;
+import com.campus.trade.history.service.BrowseHistoryService;
 import com.campus.trade.product.dto.CreateProductRequest;
 import com.campus.trade.product.service.ProductService;
+import com.campus.trade.product.service.ProductDetailCacheService;
 import com.campus.trade.product.vo.MyProductVO;
 import com.campus.trade.product.vo.ProductDetailVO;
 import com.campus.trade.product.vo.ProductIdVO;
@@ -55,6 +57,12 @@ class ProductFlowIntegrationTest {
     @Autowired
     private LoginSessionService loginSessionService;
 
+    @Autowired
+    private BrowseHistoryService browseHistoryService;
+
+    @Autowired
+    private ProductDetailCacheService productDetailCacheService;
+
     @Test
     void shouldCreateSubmitReviewAndExposeProductAfterApproval() {
         String unique = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -76,6 +84,7 @@ class ProductFlowIntegrationTest {
         // 登录会写 Redis；finally 中删除当前会话，避免测试 token 遗留。
         var claims = jwtProvider.parse(login.token());
 
+        Long productId = null;
         try {
             UserContext.set(new CurrentUser(claims.userId(), 0, claims.tokenId()));
             ProductIdVO created = productService.create(new CreateProductRequest(
@@ -87,12 +96,14 @@ class ProductFlowIntegrationTest {
                     category.getId(),
                     "东校区",
                     "三食堂门口",
-                    List.of("/uploads/integration-product.jpg")
+                    // 上传接口实际返回 /api/uploads 前缀；测试数据也保持同一公开 URL 约定。
+                    List.of("/api/uploads/integration-product.jpg")
             ));
+            productId = created.id();
 
             MyProductVO mine = productService.listMine(null).list().get(0);
             assertThat(mine.id()).isEqualTo(created.id());
-            assertThat(mine.images()).containsExactly("/uploads/integration-product.jpg");
+            assertThat(mine.images()).containsExactly("/api/uploads/integration-product.jpg");
             assertThat(mine.status()).isZero();
 
             productService.submitReview(created.id());
@@ -104,15 +115,28 @@ class ProductFlowIntegrationTest {
             ProductDetailVO detail = productService.getPublicDetail(created.id());
             assertThat(detail.status()).isEqualTo(3);
             assertThat(detail.categoryName()).isEqualTo(category.getName());
-            assertThat(detail.images()).containsExactly("/uploads/integration-product.jpg");
+            assertThat(detail.images()).containsExactly("/api/uploads/integration-product.jpg");
+
+            // 第二次读取应优先命中 Redis 缓存，接口返回内容仍应与首次查询一致。
+            ProductDetailVO cachedDetail = productService.getPublicDetail(created.id());
+            assertThat(cachedDetail.title()).isEqualTo("集成测试商品");
             assertThat(detail.seller().nickname()).isEqualTo("商品集成测试用户");
             assertThat(productService.listPublic(null, null, null, null, null, 1, 10).list())
                     .extracting(item -> item.id())
+                    .contains(created.id());
+
+            // 商品详情在当前已认证用户下访问，服务端应自动 upsert 浏览记录。
+            assertThat(browseHistoryService.listMine(1, 10).list())
+                    .extracting(item -> item.productId())
                     .contains(created.id());
         } finally {
             UserContext.clear();
             // AuthService.login 创建的 Redis 白名单不受数据库事务管理，必须显式删除。
             loginSessionService.delete(claims.tokenId());
+            // Redis 缓存也不参与数据库回滚，主动删除测试商品 key，避免留下短期脏缓存。
+            if (productId != null) {
+                productDetailCacheService.invalidate(productId);
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import com.campus.trade.category.mapper.CategoryMapper;
 import com.campus.trade.common.context.CurrentUser;
 import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
+import com.campus.trade.history.service.BrowseHistoryService;
 import com.campus.trade.product.dto.CreateProductRequest;
 import com.campus.trade.product.dto.UpdateProductRequest;
 import com.campus.trade.product.entity.Product;
@@ -46,11 +47,22 @@ class ProductServiceTest {
     @Mock
     private CategoryMapper categoryMapper;
 
+    @Mock
+    private ProductDetailCacheService productDetailCacheService;
+
+    @Mock
+    private BrowseHistoryService browseHistoryService;
+
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(productMapper, categoryMapper);
+        productService = new ProductService(
+                productMapper,
+                categoryMapper,
+                productDetailCacheService,
+                browseHistoryService
+        );
     }
 
     @AfterEach
