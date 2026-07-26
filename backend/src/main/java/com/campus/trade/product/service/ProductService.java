@@ -165,13 +165,19 @@ public class ProductService {
     }
 
     /**
-     * 卖家下架自己的在售商品。
+     * 卖家下架自己已公开展示的商品。
+     *
+     * <p>在售(3) 与售罄(5) 都属于已公开展示，都可以下架；下架后商品回到可编辑的状态(4)。</p>
      */
     @Transactional
     public void offShelf(Long productId) {
         Long sellerId = UserContext.requireCurrentUser().userId();
         Product product = requireOwnedProduct(productId, sellerId);
-        requireStatus(product, Set.of(ProductStatus.ON_SALE.getCode()), "只有在售商品能下架");
+        requireStatus(
+                product,
+                Set.of(ProductStatus.ON_SALE.getCode(), ProductStatus.SOLD_OUT.getCode()),
+                "只有在售或已售罄的商品能下架"
+        );
 
         if (productMapper.offShelfBySeller(productId, sellerId) == 0) {
             throw conflict("商品状态已变化，请刷新后重试");
@@ -180,7 +186,10 @@ public class ProductService {
     }
 
     /**
-     * 调整在售商品库存。库存减少后至少保留一件，售罄由订单模块扣减库存时处理。
+     * 增减商品库存。
+     *
+     * <p>在售(3) 商品减少库存后至少保留一件，减到零由订单模块扣减库存时才会置为售罄；
+     * 售罄(5) 商品补货后由 SQL 自动恢复为在售(3)，否则商品卖完一次就永远卖不出去了。</p>
      */
     @Transactional
     public void adjustStock(Long productId, StockAdjustRequest request) {
@@ -190,7 +199,11 @@ public class ProductService {
 
         Long sellerId = UserContext.requireCurrentUser().userId();
         Product product = requireOwnedProduct(productId, sellerId);
-        requireStatus(product, Set.of(ProductStatus.ON_SALE.getCode()), "只有在售商品能调整库存");
+        requireStatus(
+                product,
+                Set.of(ProductStatus.ON_SALE.getCode(), ProductStatus.SOLD_OUT.getCode()),
+                "只有在售或已售罄的商品能调整库存"
+        );
 
         if (product.getStock() + request.delta() < 1) {
             throw conflict("库存减少后至少要保留 1 件");

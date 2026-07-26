@@ -24,6 +24,7 @@ import com.campus.trade.user.entity.User;
 import com.campus.trade.user.mapper.UserMapper;
 import com.campus.trade.review.mapper.ReviewMapper;
 import com.campus.trade.dispute.mapper.DisputeMapper;
+import com.campus.trade.dispute.model.DisputeRules;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -281,9 +282,25 @@ public class OrderService {
                 (isBuyer || isSeller) && isCancellable(status),
                 isBuyer && status == OrderStatus.CONFIRMED.getCode(),
                 isBuyer && status == OrderStatus.COMPLETED.getCode() && !reviewMapper.existsByOrderId(order.getId()),
-                (isBuyer || isSeller) && (status == OrderStatus.CONFIRMED.getCode() || status == OrderStatus.COMPLETED.getCode())
-                        && !disputeMapper.existsByOrderId(order.getId())
+                (isBuyer || isSeller) && canDispute(order, status)
         );
+    }
+
+    /**
+     * 是否还能对该订单发起纠纷：状态允许、未发起过，且已完成订单仍在售后窗口内。
+     *
+     * <p>这里的判断必须与 DisputeService 完全一致，否则前端会出现“按钮能点但一点就 409”。
+     * 因此窗口规则统一放在 {@link DisputeRules} 里，两边共用同一份代码。</p>
+     */
+    private boolean canDispute(TradeOrder order, int status) {
+        if (status != OrderStatus.CONFIRMED.getCode() && status != OrderStatus.COMPLETED.getCode()) {
+            return false;
+        }
+        if (status == OrderStatus.COMPLETED.getCode()
+                && !DisputeRules.withinAfterSaleWindow(order.getFinishedAt())) {
+            return false;
+        }
+        return !disputeMapper.existsByOrderId(order.getId());
     }
 
     private ProductSnapshot requireSnapshot(Long orderId) {

@@ -154,8 +154,8 @@ onMounted(loadList)
               </el-popconfirm>
             </template>
 
-            <!-- 在售(3)：下架 + 调库存 -->
-            <template v-else-if="row.status === 3">
+            <!-- 在售(3) / 已售罄(5)：下架 + 调库存（售罄商品补货后后端会自动恢复为在售） -->
+            <template v-else-if="[3, 5].includes(row.status)">
               <el-popconfirm title="确认下架该商品？" @confirm="onOffShelf(row)">
                 <template #reference>
                   <el-button size="small" type="warning">下架</el-button>
@@ -176,9 +176,9 @@ onMounted(loadList)
               </el-popover>
             </template>
 
-            <!-- 已售罄(5)：无操作 -->
+            <!-- 其余状态（如待审核已在上面处理）没有可执行操作，这里兜底 -->
             <template v-else>
-              <span class="no-action">等待买家取消回补，或在有货后重新上架</span>
+              <span class="no-action">当前状态无可执行的操作</span>
             </template>
           </template>
         </el-table-column>

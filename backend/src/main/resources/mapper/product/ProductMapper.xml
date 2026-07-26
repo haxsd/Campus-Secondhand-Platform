@@ -229,35 +229,45 @@
           AND deleted = 0
     </update>
 
+    <!-- 在售(3) 和 售罄(5) 都属于“已公开展示”，都允许卖家主动下架；售罄商品下架后才能重新编辑。 -->
     <update id="offShelfBySeller">
         UPDATE product
         SET status = 4,
             version = version + 1
         WHERE id = #{id}
           AND seller_id = #{sellerId}
-          AND status = 3
+          AND status IN (3, 5)
           AND deleted = 0
     </update>
 
+    <!--
+        卖家增减库存。售罄(5) 的商品补货后应当自动回到在售(3)，否则卖完一次就再也卖不了。
+        同样因为 SET 从左到右求值，status 写在 stock 之前，才能基于更新前的状态与库存判断。
+    -->
     <update id="adjustStockBySeller">
         UPDATE product
-        SET stock = stock + #{delta},
+        SET status = CASE WHEN status = 5 AND stock + #{delta} &gt; 0 THEN 3 ELSE status END,
+            stock = stock + #{delta},
             version = version + 1
         WHERE id = #{id}
           AND seller_id = #{sellerId}
-          AND status = 3
+          AND status IN (3, 5)
           AND stock + #{delta} &gt;= 1
           AND deleted = 0
     </update>
 
     <!--
         下单扣库存使用一条条件 UPDATE 保证并发安全：status=3、库存足够且未删除才允许扣减。
-        CASE 只依据更新前库存判断；当 stock - quantity 恰好为 0 时改为售罄(5)。
+        扣完最后一件时把商品置为售罄(5)。
+
+        注意 SET 子句的书写顺序：MySQL 从左到右依次求值并赋值，后面的表达式读到的是前面刚改过的新值。
+        因此 status 必须写在 stock 之前，CASE 里才拿得到“更新前”的库存；若写在 stock 之后，
+        stock 已经被减过一次，CASE 中会再减一次，导致状态判断整体错位。
     -->
     <update id="decreaseStockForOrder">
         UPDATE product
-        SET stock = stock - #{quantity},
-            status = CASE WHEN stock - #{quantity} = 0 THEN 5 ELSE status END,
+        SET status = CASE WHEN stock - #{quantity} = 0 THEN 5 ELSE status END,
+            stock = stock - #{quantity},
             version = version + 1
         WHERE id = #{id}
           AND status = 3

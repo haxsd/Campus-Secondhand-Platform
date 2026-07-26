@@ -6,6 +6,7 @@ import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.history.service.BrowseHistoryService;
 import com.campus.trade.product.dto.CreateProductRequest;
+import com.campus.trade.product.dto.StockAdjustRequest;
 import com.campus.trade.product.dto.UpdateProductRequest;
 import com.campus.trade.product.entity.Product;
 import com.campus.trade.product.mapper.ProductMapper;
@@ -141,6 +142,47 @@ class ProductServiceTest {
 
         verify(productMapper).reviewByAdmin(101L, ProductStatus.ON_SALE.getCode());
         verify(productMapper).insertReviewLog(101L, 99L, 1, null);
+    }
+
+    @Test
+    void shouldAllowSellerToRestockSoldOutProduct() {
+        UserContext.set(new CurrentUser(7L, 0, "token-7"));
+        Product soldOut = product(7L, ProductStatus.SOLD_OUT.getCode());
+        soldOut.setStock(0);
+        when(productMapper.selectById(101L)).thenReturn(Optional.of(soldOut));
+        when(productMapper.adjustStockBySeller(101L, 7L, 2)).thenReturn(1);
+
+        productService.adjustStock(101L, new StockAdjustRequest(2));
+
+        // 售罄不能是死状态：补货后 SQL 会把商品恢复为在售，这里先保证 Service 不再拦下请求。
+        verify(productMapper).adjustStockBySeller(101L, 7L, 2);
+    }
+
+    @Test
+    void shouldAllowSellerToOffShelfSoldOutProduct() {
+        UserContext.set(new CurrentUser(7L, 0, "token-7"));
+        Product soldOut = product(7L, ProductStatus.SOLD_OUT.getCode());
+        soldOut.setStock(0);
+        when(productMapper.selectById(101L)).thenReturn(Optional.of(soldOut));
+        when(productMapper.offShelfBySeller(101L, 7L)).thenReturn(1);
+
+        productService.offShelf(101L);
+
+        // 下架后商品回到 4，卖家才能重新编辑，否则售罄商品永远改不了。
+        verify(productMapper).offShelfBySeller(101L, 7L);
+    }
+
+    @Test
+    void shouldRejectStockAdjustOnDraftProduct() {
+        UserContext.set(new CurrentUser(7L, 0, "token-7"));
+        when(productMapper.selectById(101L))
+                .thenReturn(Optional.of(product(7L, ProductStatus.DRAFT.getCode())));
+
+        assertThatThrownBy(() -> productService.adjustStock(101L, new StockAdjustRequest(1)))
+                .isInstanceOf(BizException.class)
+                .hasMessage("只有在售或已售罄的商品能调整库存");
+
+        verify(productMapper, never()).adjustStockBySeller(any(), any(), any());
     }
 
     private CreateProductRequest createRequest() {

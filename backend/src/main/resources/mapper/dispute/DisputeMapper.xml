@@ -1,6 +1,88 @@
-<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd"><mapper namespace="com.campus.trade.dispute.mapper.DisputeMapper">
- <select id="existsByOrderId" resultType="boolean">SELECT EXISTS(SELECT 1 FROM dispute WHERE order_id=#{orderId})</select><select id="selectById" resultType="com.campus.trade.dispute.entity.Dispute">SELECT id,order_id,applicant_id,respondent_id,reason_type,statement,evidence evidence_json,status,handler_id,handle_note,handled_at,created_at,updated_at FROM dispute WHERE id=#{id} LIMIT 1</select>
- <insert id="insert" parameterType="com.campus.trade.dispute.entity.Dispute" useGeneratedKeys="true" keyProperty="id">INSERT INTO dispute(order_id,applicant_id,respondent_id,reason_type,statement,evidence,status) VALUES(#{orderId},#{applicantId},#{respondentId},#{reasonType},#{statement},CAST(#{evidenceJson} AS JSON),#{status})</insert>
- <select id="selectPage" resultType="com.campus.trade.dispute.entity.Dispute">SELECT d.id,d.order_id,d.applicant_id,d.respondent_id,d.reason_type,d.statement,d.evidence evidence_json,d.status,d.handler_id,d.handle_note,d.handled_at,d.created_at,d.updated_at FROM dispute d <where><if test="status!=null">d.status=#{status}</if></where> ORDER BY d.created_at DESC,d.id DESC LIMIT #{pageSize} OFFSET #{offset}</select><select id="count" resultType="long">SELECT COUNT(*) FROM dispute <if test="status!=null">WHERE status=#{status}</if></select>
- <!-- 仅待处理/待补材料可裁决，条件更新保证管理员并发处理时只有一个成功。 --><update id="updateHandled">UPDATE dispute SET status=#{targetStatus},handler_id=#{handlerId},handle_note=#{note},handled_at=CASE WHEN #{targetStatus}=1 THEN NULL ELSE CURRENT_TIMESTAMP END WHERE id=#{id} AND status IN(0,1)</update>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.dispute.mapper.DisputeMapper">
+
+    <!-- 纠纷公共列；evidence 是 JSON 列，取别名 evidence_json 以对应实体的 evidenceJson 字段。 -->
+    <sql id="disputeColumns">
+        id,
+        order_id,
+        applicant_id,
+        respondent_id,
+        reason_type,
+        statement,
+        evidence evidence_json,
+        status,
+        handler_id,
+        handle_note,
+        handled_at,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="existsByOrderId" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM dispute WHERE order_id = #{orderId})
+    </select>
+
+    <select id="selectById" resultType="com.campus.trade.dispute.entity.Dispute">
+        SELECT
+        <include refid="disputeColumns"/>
+        FROM dispute
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <!-- 证据列表由 Service 序列化成 JSON 字符串后传入，这里用 CAST 写进 JSON 列。 -->
+    <insert id="insert"
+            parameterType="com.campus.trade.dispute.entity.Dispute"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO dispute (order_id,
+                             applicant_id,
+                             respondent_id,
+                             reason_type,
+                             statement,
+                             evidence,
+                             status)
+        VALUES (#{orderId},
+                #{applicantId},
+                #{respondentId},
+                #{reasonType},
+                #{statement},
+                CAST(#{evidenceJson} AS JSON),
+                #{status})
+    </insert>
+
+    <!-- status 为 null 时不加过滤条件，表示查询全部状态。 -->
+    <select id="selectPage" resultType="com.campus.trade.dispute.entity.Dispute">
+        SELECT
+        <include refid="disputeColumns"/>
+        FROM dispute
+        <where>
+            <if test="status != null">status = #{status}</if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM dispute
+        <if test="status != null">WHERE status = #{status}</if>
+    </select>
+
+    <!--
+        裁决纠纷。
+        WHERE 里的 status IN (0,1) 保证只有“待处理/待补材料”的纠纷可以被裁决：
+        两名管理员同时提交时，第二个人的影响行数为 0，Service 会据此抛出 409。
+        目标状态为 1（要求补充材料）时纠纷尚未真正处理完，因此 handled_at 保持为空。
+    -->
+    <update id="updateHandled">
+        UPDATE dispute
+        SET status = #{targetStatus},
+            handler_id = #{handlerId},
+            handle_note = #{note},
+            handled_at = CASE WHEN #{targetStatus} = 1 THEN NULL ELSE CURRENT_TIMESTAMP END
+        WHERE id = #{id}
+          AND status IN (0, 1)
+    </update>
 </mapper>

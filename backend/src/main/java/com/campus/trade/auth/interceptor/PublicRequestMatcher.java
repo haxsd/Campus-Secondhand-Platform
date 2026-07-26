@@ -25,7 +25,6 @@ public class PublicRequestMatcher {
     );
 
     private static final Pattern PRODUCT_DETAIL_PATTERN = Pattern.compile("^/products/\\d+$");
-    private static final Pattern SELLER_REVIEW_PATTERN = Pattern.compile("^/reviews/seller/\\d+$");
 
     public boolean isPublic(HttpServletRequest request) {
         // request URI 包含 context-path=/api，先转换为应用内部路径，例如 /auth/login。
@@ -55,8 +54,7 @@ public class PublicRequestMatcher {
         // GET 请求也采用白名单，防止未来新增的敏感查询接口被默认公开。
         return "/categories".equals(path)
                 || "/products".equals(path)
-                || PRODUCT_DETAIL_PATTERN.matcher(path).matches()
-                || SELLER_REVIEW_PATTERN.matcher(path).matches();
+                || PRODUCT_DETAIL_PATTERN.matcher(path).matches();
     }
 
     private String pathWithinApplication(HttpServletRequest request) {

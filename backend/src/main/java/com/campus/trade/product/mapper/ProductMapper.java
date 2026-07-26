@@ -78,11 +78,12 @@ public interface ProductMapper {
     /** 卖家撤回待审核商品，回到草稿。 */
     int withdrawReviewBySeller(@Param("id") Long id, @Param("sellerId") Long sellerId);
 
-    /** 卖家下架在售商品。 */
+    /** 卖家下架已公开展示（在售或已售罄）的商品。 */
     int offShelfBySeller(@Param("id") Long id, @Param("sellerId") Long sellerId);
 
     /**
-     * 在售商品调整库存；SQL 会同时校验归属、状态及减少后的库存下限。
+     * 调整库存；SQL 会同时校验归属、状态及减少后的库存下限，
+     * 并把补货后的售罄商品自动恢复为在售。
      */
     int adjustStockBySeller(
             @Param("id") Long id,

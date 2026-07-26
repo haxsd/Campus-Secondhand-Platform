@@ -566,23 +566,25 @@ export function mockWithdrawReview(id) {
   return delay(null)
 }
 
-// POST /api/products/{id}/off-shelf —— 下架（仅在售 → 已下架）
+// POST /api/products/{id}/off-shelf —— 下架（在售 3 或已售罄 5 → 已下架 4）
 export function mockOffShelf(id) {
   const p = findMine(id)
   if (!p) return fail(404, '商品不存在')
-  if (p.status !== 3) return fail(409, '只有在售商品能下架')
+  if (![3, 5].includes(p.status)) return fail(409, '只有在售或已售罄的商品能下架')
   p.status = 4
   return delay(null)
 }
 
-// POST /api/products/{id}/stock —— 在售时调库存 { delta }（减少后至少保留 1）
+// POST /api/products/{id}/stock —— 调库存 { delta }（在售 3 或已售罄 5；减少后至少保留 1）
 export function mockAdjustStock(id, delta) {
   const p = findMine(id)
   if (!p) return fail(404, '商品不存在')
-  if (p.status !== 3) return fail(409, '只有在售商品能调整库存')
+  if (![3, 5].includes(p.status)) return fail(409, '只有在售或已售罄的商品能调整库存')
   const next = p.stock + Number(delta)
   if (next < 1) return fail(409, '库存减少后至少要保留 1 件')
   p.stock = next
+  // 与后端 SQL 一致：售罄商品补货后自动恢复为在售。
+  if (p.status === 5 && next > 0) p.status = 3
   return delay({ stock: next })
 }
 

@@ -125,8 +125,8 @@
 | PUT | /api/products/{id} | 编辑（仅草稿/驳回/已下架，需带 version） |
 | POST | /api/products/{id}/submit-review | 申请上架（进入待审核；前提：状态为草稿/驳回/已下架 且 stock>0） |
 | POST | /api/products/{id}/withdraw-review | 撤回审核申请（回到草稿） |
-| POST | /api/products/{id}/off-shelf | 下架（仅在售） |
-| POST | /api/products/{id}/stock | 在售时调库存 `{ "delta": 1 }`（减少后至少保留 1） |
+| POST | /api/products/{id}/off-shelf | 下架（在售 3 或已售罄 5；下架后变 4，才能重新编辑） |
+| POST | /api/products/{id}/stock | 调库存 `{ "delta": 1 }`（在售 3 或已售罄 5；减少后至少保留 1，售罄商品补货后自动回到在售） |
 
 #### POST /api/products（发布）
 ```json
@@ -178,7 +178,8 @@ PUT 编辑请求体同上 + `"version": 3`；version 不匹配返回 409"商品�
 - `confirmDeadline` = 下单时间 + 24 小时（后端常量，可配置）。
 - 重复 requestId：返回第一次创建的订单（code=0）。
 - 库存不足/商品状态变化：409"库存不足或商品已变化"。
-- 连续点击：429。买家=卖家本人：400。
+- 买家=卖家本人：400。
+- 连续点击返回 429 的防抖**当前未实现**；重复下单由 requestId 幂等拦住。
 
 ### GET /api/orders/{id}
 ```json
@@ -202,7 +203,7 @@ PUT 编辑请求体同上 + `"version": 3`；version 不匹配返回 409"商品�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | /api/reviews | 提交评价（订单已完成且当前用户是买家） |
-| GET | /api/reviews/seller/{sellerId} | 某卖家收到的可见评价（分页） |
+| GET | /api/reviews/seller/{sellerId} | 某卖家收到的可见评价（分页）——**当前未实现**：前端未调用，卖家评价已内嵌在商品详情里 |
 
 ### POST /api/reviews
 ```json
@@ -217,7 +218,7 @@ PUT 编辑请求体同上 + `"version": 3`；version 不匹配返回 409"商品�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | /api/disputes | 发起纠纷（订单已确认，或已完成且在售后窗口内；窗口默认 7 天，后端常量可配置） |
-| GET | /api/disputes/{id} | 纠纷详情（当事双方/管理员） |
+| GET | /api/disputes/{id} | 纠纷详情（当事双方/管理员）——**当前未实现**：前端未调用，纠纷进展看订单详情的状态时间线 |
 | GET | /api/admin/disputes | 管理员：纠纷列表，参数 status、分页 |
 | POST | /api/admin/disputes/{id}/handle | 管理员处理 |
 
@@ -245,7 +246,7 @@ PUT 编辑请求体同上 + `"version": 3`；version 不匹配返回 409"商品�
 
 ## 9. 后端实现提示（与文档口径对齐）
 
-- 下单：Redis `SET NX EX 5` 防抖 → 查 `uk_buyer_request` 幂等 → 条件更新扣库存（`where status=3 and stock>=?`）→ 同事务写订单+快照+日志 → afterCommit 删商品缓存。
+- 下单：Redis `SET NX EX 5` 防抖（**当前未实现**） → 查 `uk_buyer_request` 幂等 → 条件更新扣库存（`where status=3 and stock>=?`）→ 同事务写订单+快照+日志 → afterCommit 删商品缓存。
 - 超时关单：定时任务每分钟扫 `status=0 and confirm_deadline<=now()`（走 `idx_timeout_scan`），调用与手动取消同一个 `timeoutCancel(orderId)`。
 - 所有状态流转：`update ... where id=? and status=旧状态`，影响行数 0 → 409。
 - 详情缓存：`product:detail:{id}` 5 分钟+随机；空值 `product:null:{id}` 10 秒；写路径 afterCommit 同时删两个 key。
