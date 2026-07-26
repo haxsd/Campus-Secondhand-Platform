@@ -13,7 +13,7 @@ export function getPendingProducts() {
 
 // GET /api/admin/products/{id} —— 待审核商品完整资料，仅管理员审核详情页使用。
 export function getPendingProductDetail(id) {
-  if (useMock) return mockGetPendingProducts().then((res) => res.list.find((item) => String(item.id) === String(id)))
+  if (useMock) return mockGetPendingProducts().then((res) => res.find((item) => String(item.id) === String(id)))
   return get(`/admin/products/${id}`)
 }
 

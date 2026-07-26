@@ -1,6 +1,5 @@
 <script setup>
-// 管理端·商品审核：列出全站待审核(status=1)商品，管理员逐条「通过 / 驳回」。
-// 通过 → 商品变在售(3)；驳回 → 变审核驳回(2)并附原因（卖家在"我的商品"能看到原因）。
+// 管理端·商品审核：列表只展示摘要，管理员进入详情页后才能通过或驳回。
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getPendingProducts } from '@/api/admin'
@@ -14,7 +13,7 @@ async function loadList() {
   loading.value = true
   try {
     const res = await getPendingProducts()
-    list.value = res.list
+    list.value = res
   } finally {
     loading.value = false
   }

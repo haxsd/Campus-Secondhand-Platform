@@ -30,9 +30,9 @@ async function loadList() {
   loading.value = true
   try {
     const res = await getMyProducts(activeStatus.value)
-    list.value = res.list
+    list.value = res
     // 给在售商品初始化调库存的默认增减量
-    res.list.forEach((p) => {
+    res.forEach((p) => {
       if (deltaMap[p.id] === undefined) deltaMap[p.id] = 1
     })
   } finally {

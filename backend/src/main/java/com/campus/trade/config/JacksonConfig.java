@@ -23,18 +23,17 @@ public class JacksonConfig {
     public static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
 
     /**
-     * 将 Long 和 long 统一序列化为字符串。
+     * 将包装类型 Long 序列化为字符串。
      *
      * <p>数据库主键使用 BIGINT，可能超过 JavaScript 的安全整数范围。
-     * 在后端统一转成字符串后，商品 ID、用户 ID 和订单相关 ID 都不会在前端丢失精度。</p>
+     * VO 中的 ID 都使用 Long，因此转成字符串后不会在前端丢失精度。
+     * 基本类型 long 通常表示分页总数等统计值，仍按 JSON 数字返回。</p>
      */
     @Bean
     public Jackson2ObjectMapperBuilderCustomizer longToStringCustomizer() {
         return builder -> {
             // Long.class 处理包装类型，例如 VO 中的 Long id。
             builder.serializerByType(Long.class, ToStringSerializer.instance);
-            // Long.TYPE 处理基本类型 long，避免两个类型表现不一致。
-            builder.serializerByType(Long.TYPE, ToStringSerializer.instance);
         };
     }
 

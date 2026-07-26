@@ -297,7 +297,54 @@ public class ProductService {
             // 数据完整性异常时不暴露半成品商品详情，也不向 Redis 写入长期正常缓存。
             return null;
         }
-        ProductSellerVO sellerVO = toSellerVO(seller);
+        return buildDetail(product, seller);
+    }
+
+    /**
+     * 查询当前卖家的商品，包含草稿、驳回等不公开状态，供“我的商品”页面管理。
+     */
+    @Transactional(readOnly = true)
+    public List<MyProductVO> listMine(Integer status) {
+        if (status != null && !ProductStatus.isValid(status)) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "商品状态不正确");
+        }
+
+        Long sellerId = UserContext.requireCurrentUser().userId();
+        return productMapper.selectBySeller(sellerId, status).stream()
+                .map(this::toMyProductVO)
+                .toList();
+    }
+
+    /**
+     * 查询管理员待审核商品列表。
+     */
+    @Transactional(readOnly = true)
+    public List<PendingProductVO> listPending() {
+        return productMapper.selectPendingProducts().stream()
+                .map(this::toPendingProductVO)
+                .toList();
+    }
+
+    /**
+     * 管理员审核前读取完整资料，不使用公开详情缓存。
+     * 待审核商品不能被游客读取，审核写操作仍会再次校验状态防止旧页面误操作。
+     */
+    @Transactional(readOnly = true)
+    public ProductDetailVO getPendingDetailForAdmin(Long productId) {
+        Product product = productMapper.selectById(productId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
+        requireStatus(product, Set.of(ProductStatus.PENDING_REVIEW.getCode()), "商品已不在待审核状态");
+        SellerSummary seller = productMapper.selectSellerSummary(product.getSellerId())
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "卖家不存在"));
+        return buildDetail(product, seller);
+    }
+
+    /**
+     * 统一组装公开详情和管理员审核详情，避免两处查询字段逐渐不一致。
+     *
+     * <p>调用方负责决定商品状态是否允许访问，并保证卖家信息存在。</p>
+     */
+    private ProductDetailVO buildDetail(Product product, SellerSummary seller) {
         List<RecentReviewVO> reviews = productMapper.selectRecentReviewsBySellerId(product.getSellerId())
                 .stream()
                 .map(this::toRecentReviewVO)
@@ -317,56 +364,8 @@ public class ProductService {
                 productMapper.selectCategoryNameById(product.getCategoryId()),
                 product.getViewCount(),
                 productMapper.selectImageUrlsByProductId(product.getId()),
-                sellerVO,
+                toSellerVO(seller),
                 reviews
-        );
-    }
-
-    /**
-     * 查询当前卖家的商品，包含草稿、驳回等不公开状态，供“我的商品”页面管理。
-     */
-    @Transactional(readOnly = true)
-    public PageResult<MyProductVO> listMine(Integer status) {
-        if (status != null && !ProductStatus.isValid(status)) {
-            throw new BizException(ErrorCode.BAD_REQUEST, "商品状态不正确");
-        }
-
-        Long sellerId = UserContext.requireCurrentUser().userId();
-        List<MyProductVO> list = productMapper.selectBySeller(sellerId, status).stream()
-                .map(this::toMyProductVO)
-                .toList();
-        // 当前前端不分页“我的商品”，仍使用 PageResult 保持接口数据结构统一。
-        return new PageResult<>(list, list.size(), 1, list.size());
-    }
-
-    /**
-     * 查询管理员待审核商品列表。
-     */
-    @Transactional(readOnly = true)
-    public PageResult<PendingProductVO> listPending() {
-        List<PendingProductVO> list = productMapper.selectPendingProducts().stream()
-                .map(this::toPendingProductVO)
-                .toList();
-        return new PageResult<>(list, list.size(), 1, list.size());
-    }
-
-    /**
-     * 管理员审核前读取完整资料，不使用公开详情缓存。
-     * 待审核商品不能被游客读取，审核写操作仍会再次校验状态防止旧页面误操作。
-     */
-    @Transactional(readOnly = true)
-    public ProductDetailVO getPendingDetailForAdmin(Long productId) {
-        Product product = productMapper.selectById(productId)
-                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
-        requireStatus(product, Set.of(ProductStatus.PENDING_REVIEW.getCode()), "商品已不在待审核状态");
-        SellerSummary seller = productMapper.selectSellerSummary(product.getSellerId())
-                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "卖家不存在"));
-        return new ProductDetailVO(
-                product.getId(), product.getTitle(), product.getDescription(), product.getPrice(), product.getStock(),
-                product.getItemCondition(), product.getCampus(), product.getTradePlace(), product.getStatus(),
-                product.getCategoryId(), productMapper.selectCategoryNameById(product.getCategoryId()), product.getViewCount(),
-                productMapper.selectImageUrlsByProductId(product.getId()), toSellerVO(seller),
-                productMapper.selectRecentReviewsBySellerId(product.getSellerId()).stream().map(this::toRecentReviewVO).toList()
         );
     }
 

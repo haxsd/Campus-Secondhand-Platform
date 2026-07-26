@@ -78,11 +78,6 @@ export function mockLogout() {
   return delay(null)
 }
 
-export function mockMe() {
-  const { password: _pwd, ...safe } = mockUsers[0]
-  return delay(safe)
-}
-
 // 个人中心 mock：真实项目由 JWT 决定当前用户；演示模式固定使用第一个普通用户。
 function currentMockUser() {
   return mockUsers[0]

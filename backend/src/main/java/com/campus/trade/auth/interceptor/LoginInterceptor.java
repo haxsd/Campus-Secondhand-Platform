@@ -96,7 +96,7 @@ public class LoginInterceptor implements HandlerInterceptor {
 
             // 第 5 步：查询 Redis 白名单。
             // JWT 合法但 Redis key 已删除时，说明用户已经退出或 token 被主动吊销。
-            if (!loginSessionService.isActive(claims)) {
+            if (!loginSessionService.isActive(claims.tokenId())) {
                 writeFailure(response, ErrorCode.UNAUTHORIZED);
                 return false;
             }

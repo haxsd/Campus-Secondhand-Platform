@@ -76,7 +76,7 @@ async function loadForEdit() {
   pageLoading.value = true
   try {
     const response = await getMyProducts()
-    const p = response.list.find((item) => String(item.id) === String(productId.value))
+    const p = response.find((item) => String(item.id) === String(productId.value))
     if (!p) throw new Error('商品不存在或无权编辑')
     form.title = p.title
     form.description = p.description

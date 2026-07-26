@@ -4,7 +4,6 @@ import com.campus.trade.auth.dto.LoginRequest;
 import com.campus.trade.auth.dto.RegisterRequest;
 import com.campus.trade.auth.jwt.IssuedToken;
 import com.campus.trade.auth.jwt.JwtProvider;
-import com.campus.trade.auth.vo.CurrentUserVO;
 import com.campus.trade.auth.vo.LoginResponse;
 import com.campus.trade.auth.vo.LoginUserVO;
 import com.campus.trade.common.context.CurrentUser;
@@ -118,8 +117,6 @@ public class AuthService {
         // 后续请求必须同时通过 JWT 验签和 Redis 检查，退出后才能立即失效。
         loginSessionService.create(
                 issuedToken.tokenId(),
-                user.getId(),
-                user.getRole(),
                 issuedToken.ttl()
         );
 
@@ -146,26 +143,4 @@ public class AuthService {
         loginSessionService.delete(currentUser.tokenId());
     }
 
-    /**
-     * 从数据库读取当前用户，避免返回 token 中可能已经过时的昵称等资料。
-     */
-    @Transactional(readOnly = true)
-    public CurrentUserVO currentUser() {
-        // userId 来源于已经验签的 JWT，而不是前端请求参数，防止查询他人资料。
-        Long userId = UserContext.requireCurrentUser().userId();
-
-        // JWT 只保存稳定身份；昵称、头像等可变资料每次从数据库获取最新值。
-        User user = userMapper.selectById(userId)
-                .orElseThrow(() -> new BizException(ErrorCode.UNAUTHORIZED, "登录用户不存在"));
-
-        // 使用专用 VO 控制返回字段，明确排除 phone、password、status 等内部信息。
-        return new CurrentUserVO(
-                user.getId(),
-                user.getStudentNo(),
-                user.getNickname(),
-                user.getAvatar(),
-                user.getCampus(),
-                user.getRole()
-        );
-    }
 }

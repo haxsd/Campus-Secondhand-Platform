@@ -113,7 +113,7 @@ class AuthServiceTest {
         assertThat(response.token()).isEqualTo("jwt-value");
         assertThat(response.user().id()).isEqualTo(101L);
         assertThat(response.user().nickname()).isEqualTo("小明");
-        verify(loginSessionService).create("token-id", 101L, 0, Duration.ofDays(7));
+        verify(loginSessionService).create("token-id", Duration.ofDays(7));
     }
 
     @Test

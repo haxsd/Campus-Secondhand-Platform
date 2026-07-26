@@ -3,11 +3,9 @@ package com.campus.trade.auth.controller;
 import com.campus.trade.auth.dto.LoginRequest;
 import com.campus.trade.auth.dto.RegisterRequest;
 import com.campus.trade.auth.service.AuthService;
-import com.campus.trade.auth.vo.CurrentUserVO;
 import com.campus.trade.auth.vo.LoginResponse;
 import com.campus.trade.common.response.Result;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -74,13 +72,4 @@ public class AuthController {
         return Result.ok();
     }
 
-    /**
-     * 获取当前登录用户。
-     *
-     * <p>该接口不会直接信任 JWT 中可能过时的个人资料，而是使用 userId 重新查询数据库。</p>
-     */
-    @GetMapping("/me")
-    public Result<CurrentUserVO> currentUser() {
-        return Result.ok(authService.currentUser());
-    }
 }

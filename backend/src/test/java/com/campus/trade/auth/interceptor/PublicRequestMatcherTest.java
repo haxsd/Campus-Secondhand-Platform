@@ -29,7 +29,7 @@ class PublicRequestMatcherTest {
     @Test
     void shouldAllowLoginButProtectCurrentUser() {
         assertThat(matcher.isPublic(request("POST", "/api/auth/login"))).isTrue();
-        assertThat(matcher.isPublic(request("GET", "/api/auth/me"))).isFalse();
+        assertThat(matcher.isPublic(request("GET", "/api/users/me"))).isFalse();
     }
 
     private MockHttpServletRequest request(String method, String requestUri) {

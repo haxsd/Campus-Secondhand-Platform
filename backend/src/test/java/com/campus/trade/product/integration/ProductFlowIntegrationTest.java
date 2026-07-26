@@ -101,7 +101,7 @@ class ProductFlowIntegrationTest {
             ));
             productId = created.id();
 
-            MyProductVO mine = productService.listMine(null).list().get(0);
+            MyProductVO mine = productService.listMine(null).get(0);
             assertThat(mine.id()).isEqualTo(created.id());
             assertThat(mine.images()).containsExactly("/api/uploads/integration-product.jpg");
             assertThat(mine.status()).isZero();

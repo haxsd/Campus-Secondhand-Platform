@@ -538,7 +538,7 @@ export function mockGetMyProducts(status) {
   }
   // 按创建时间倒序
   mine = mine.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  return delay({ list: mine, total: mine.length })
+  return delay(mine)
 }
 
 // 小工具：找到我的某件商品，找不到就返回 404
@@ -596,7 +596,7 @@ export function mockGetPendingProducts() {
   const list = ALL_PRODUCTS.filter((p) => p.status === 1)
     .slice()
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  return delay({ list, total: list.length })
+  return delay(list)
 }
 
 // POST /api/admin/products/{id}/review —— 审核

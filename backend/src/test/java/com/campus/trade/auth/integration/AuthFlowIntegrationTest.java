@@ -6,10 +6,11 @@ import com.campus.trade.auth.jwt.JwtClaims;
 import com.campus.trade.auth.jwt.JwtProvider;
 import com.campus.trade.auth.service.AuthService;
 import com.campus.trade.auth.service.LoginSessionService;
-import com.campus.trade.auth.vo.CurrentUserVO;
 import com.campus.trade.auth.vo.LoginResponse;
 import com.campus.trade.common.context.CurrentUser;
 import com.campus.trade.common.context.UserContext;
+import com.campus.trade.user.service.UserProfileService;
+import com.campus.trade.user.vo.UserProfileVO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -42,6 +43,9 @@ class AuthFlowIntegrationTest {
     @Autowired
     private LoginSessionService loginSessionService;
 
+    @Autowired
+    private UserProfileService userProfileService;
+
     @Test
     void shouldRegisterLoginReadCurrentUserAndLogout() {
         String unique = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -60,14 +64,14 @@ class AuthFlowIntegrationTest {
         JwtClaims claims = jwtProvider.parse(loginResponse.token());
 
         try {
-            assertThat(loginSessionService.isActive(claims)).isTrue();
+            assertThat(loginSessionService.isActive(claims.tokenId())).isTrue();
 
             UserContext.set(new CurrentUser(claims.userId(), claims.role(), claims.tokenId()));
-            CurrentUserVO currentUser = authService.currentUser();
+            UserProfileVO currentUser = userProfileService.getCurrentProfile();
             assertThat(currentUser.studentNo()).isEqualTo(studentNo);
 
             authService.logout();
-            assertThat(loginSessionService.isActive(claims)).isFalse();
+            assertThat(loginSessionService.isActive(claims.tokenId())).isFalse();
         } finally {
             // 即使中途断言失败，也清理 ThreadLocal 与 Redis 测试登录态。
             UserContext.clear();

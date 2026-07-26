@@ -54,7 +54,7 @@ class LoginInterceptorTest {
         request.addHeader("Authorization", "Bearer valid-token");
         JwtClaims claims = new JwtClaims(7L, 0, "token-id");
         when(jwtProvider.parse("valid-token")).thenReturn(claims);
-        when(loginSessionService.isActive(claims)).thenReturn(true);
+        when(loginSessionService.isActive(claims.tokenId())).thenReturn(true);
 
         boolean allowed = interceptor.preHandle(request, new MockHttpServletResponse(), new Object());
 

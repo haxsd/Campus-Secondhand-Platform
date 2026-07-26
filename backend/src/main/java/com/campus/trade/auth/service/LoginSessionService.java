@@ -1,74 +1,44 @@
 package com.campus.trade.auth.service;
 
-import com.campus.trade.auth.jwt.JwtClaims;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
 /**
- * Redis 登录态白名单。
+ * 使用 Redis 白名单管理 JWT 登录态。
  *
- * <p>JWT 自身负责防篡改和过期校验，Redis 负责主动失效。
- * 用户退出、封禁或修改密码时删除对应键，旧 JWT 即使尚未过期也无法继续使用。</p>
- *
- * <p>Redis 中的数据示例：</p>
- * <pre>
- * key   = login:token:96d58af0-...
- * value = 15:0                 // userId:role
- * ttl   = 7 天
- * </pre>
+ * <p>JWT 负责证明令牌内容没有被篡改，Redis 只负责判断该令牌是否仍然有效。
+ * Redis 键为 {@code login:token:{jti}}，值固定为 {@code 1}，过期时间与 JWT 一致。</p>
  */
 @Service
 public class LoginSessionService {
 
     private static final String LOGIN_TOKEN_KEY_PREFIX = "login:token:";
+    private static final String ACTIVE_VALUE = "1";
 
-    /**
-     * StringRedisTemplate 的 key、value 均按普通字符串处理。
-     * 对应 Redis 最基础的 SET、GET、DEL 命令，适合登录令牌白名单这种简单键值场景。
-     */
-    private final StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
-    public LoginSessionService(StringRedisTemplate stringRedisTemplate) {
-        this.stringRedisTemplate = stringRedisTemplate;
+    public LoginSessionService(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
     }
 
-    /**
-     * 保存登录态，TTL 必须与 JWT 有效期一致。
-     */
-    public void create(String tokenId, Long userId, Integer role, Duration ttl) {
-        // 对应 Redis：SET login:token:{jti} "userId:role" EX {ttl}。
-        // set(value, ttl) 在写入值的同时设置过期时间，避免失效 token 永久占用内存。
-        stringRedisTemplate.opsForValue().set(key(tokenId), sessionValue(userId, role), ttl);
+    /** 登录成功后保存 jti，并设置与 JWT 相同的有效期。 */
+    public void create(String tokenId, Duration ttl) {
+        redisTemplate.opsForValue().set(key(tokenId), ACTIVE_VALUE, ttl);
     }
 
-    /**
-     * 同时校验键存在及其中用户信息一致，防止错误复用 jti。
-     */
-    public boolean isActive(JwtClaims claims) {
-        // Redis 中不存在该 jti，说明 token 已退出、已被主动失效或 TTL 已到期。
-        // 对应 Redis：GET login:token:{jti}。
-        String value = stringRedisTemplate.opsForValue().get(key(claims.tokenId()));
-
-        // 不只检查 key 存在，还核对 userId 和 role，防止错误的 jti 关联被接受。
-        return sessionValue(claims.userId(), claims.role()).equals(value);
+    /** Redis 中仍存在该 jti，说明当前登录态有效。 */
+    public boolean isActive(String tokenId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key(tokenId)));
     }
 
-    /**
-     * 退出登录时删除当前 token 对应的白名单键。
-     */
+    /** 退出登录或修改密码后删除 jti，使尚未过期的 JWT 立即失效。 */
     public void delete(String tokenId) {
-        // 对应 Redis：DEL login:token:{jti}。delete 是幂等的，key 已不存在时再次删除也不会产生副作用。
-        stringRedisTemplate.delete(key(tokenId));
+        redisTemplate.delete(key(tokenId));
     }
 
-    /** 统一构造登录态键，避免不同调用点出现前缀拼写不一致。 */
     private String key(String tokenId) {
         return LOGIN_TOKEN_KEY_PREFIX + tokenId;
-    }
-
-    private String sessionValue(Long userId, Integer role) {
-        return userId + ":" + role;
     }
 }

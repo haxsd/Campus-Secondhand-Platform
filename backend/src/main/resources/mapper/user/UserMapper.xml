@@ -37,7 +37,7 @@
         LIMIT 1
     </select>
 
-    <!-- /auth/me 使用 JWT 中可信的 userId 查询当前用户最新资料。 -->
+    <!-- 个人中心使用 JWT 中可信的 userId 查询当前用户最新资料。 -->
     <select id="selectById"
             resultType="com.campus.trade.user.entity.User">
         SELECT

@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 商品公开查询与卖家管理接口。
@@ -76,7 +77,7 @@ public class ProductController {
      * 查询当前登录卖家的全部商品，草稿和审核驳回商品也会返回。
      */
     @GetMapping("/mine")
-    public Result<PageResult<MyProductVO>> listMine(
+    public Result<List<MyProductVO>> listMine(
             @RequestParam(required = false) Integer status
     ) {
         return Result.ok(productService.listMine(status));

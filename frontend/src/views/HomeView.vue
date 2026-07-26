@@ -42,9 +42,8 @@ async function loadProducts() {
       pageSize: pageSize.value,
     })
     list.value = data.list
-    // 后端为了避免 JavaScript 的长整数精度问题，会把部分数字序列化为字符串。
-    // 分页组件需要稳定的 number 类型，因此在页面入口统一转换，避免页码不显示。
-    total.value = Number(data.total) || 0
+    // 分页总数是普通统计值，后端直接返回 JSON 数字。
+    total.value = data.total
   } finally {
     // 无论成功失败都要关掉 loading，否则页面会一直转圈
     loading.value = false

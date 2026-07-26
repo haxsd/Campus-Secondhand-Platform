@@ -1,6 +1,5 @@
 package com.campus.trade.product.controller;
 
-import com.campus.trade.common.response.PageResult;
 import com.campus.trade.common.response.Result;
 import com.campus.trade.product.dto.ProductReviewRequest;
 import com.campus.trade.product.service.ProductService;
@@ -15,6 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 管理员商品审核接口。
@@ -38,7 +39,7 @@ public class AdminProductController {
      * 查询全站仍处于待审核状态的商品。
      */
     @GetMapping("/pending")
-    public Result<PageResult<PendingProductVO>> listPending() {
+    public Result<List<PendingProductVO>> listPending() {
         return Result.ok(productService.listPending());
     }
 
