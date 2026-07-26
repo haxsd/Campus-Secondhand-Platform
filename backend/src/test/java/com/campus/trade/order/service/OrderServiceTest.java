@@ -7,6 +7,8 @@ import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.entity.TradeOrderLog;
 import com.campus.trade.order.mapper.OrderMapper;
 import com.campus.trade.order.model.OrderStatus;
+import com.campus.trade.order.mq.OrderTimeoutEvent;
+import com.campus.trade.order.mq.OrderTimeoutMessagePublisher;
 import com.campus.trade.order.vo.OrderCreatedVO;
 import com.campus.trade.product.entity.Product;
 import com.campus.trade.product.mapper.ProductMapper;
@@ -67,6 +69,9 @@ class OrderServiceTest {
     @Mock
     private DisputeMapper disputeMapper;
 
+    @Mock
+    private OrderTimeoutMessagePublisher timeoutMessagePublisher;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -79,7 +84,8 @@ class OrderServiceTest {
                 productDetailCacheService,
                 new ObjectMapper(),
                 reviewMapper,
-                disputeMapper
+                disputeMapper,
+                timeoutMessagePublisher
         );
     }
 
@@ -117,6 +123,10 @@ class OrderServiceTest {
         verify(orderMapper).insertSnapshot(any());
         verify(productMapper).decreaseStockForOrder(PRODUCT_ID, 2);
         verify(productDetailCacheService).invalidate(PRODUCT_ID);
+        ArgumentCaptor<OrderTimeoutEvent> eventCaptor = ArgumentCaptor.forClass(OrderTimeoutEvent.class);
+        verify(timeoutMessagePublisher).publish(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().orderId()).isEqualTo(ORDER_ID);
+        assertThat(eventCaptor.getValue().confirmDeadline()).isEqualTo(inserted.getConfirmDeadline());
     }
 
     @Test

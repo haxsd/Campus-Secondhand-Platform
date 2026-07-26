@@ -20,7 +20,7 @@ public enum OrderStatus {
     /** 买家或卖家主动取消。 */
     CANCELLED(3),
 
-    /** 系统因卖家未及时确认而取消，定时任务阶段实现。 */
+    /** 系统因卖家未及时确认而取消，由 RocketMQ 触发、定时任务补偿。 */
     TIMEOUT_CANCELLED(4),
 
     /** 交易发生争议，纠纷模块阶段实现。 */

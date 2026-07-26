@@ -29,12 +29,24 @@ campus:
     issuer: campus-trade
     # 该默认值仅用于本地开发；生产环境必须通过 CT_JWT_SECRET 设置独立随机密钥。
     secret: ${CT_JWT_SECRET:campus-trade-local-jwt-secret-change-me-2026}
-    # JWT 与 Redis 登录态使用相同有效期，默认 7 天。
+    # JWT 最长有效期为 7 天；Redis 登录态另设一天滑动过期。
     ttl: ${CT_JWT_TTL:7d}
   order:
-    # 定时任务每分钟扫描一次超时待确认订单；可用环境变量临时关闭。
+    # 定时任务始终作为超时关单补偿；即使 MQ 发送失败或积压，也会最终处理到期订单。
     timeout-scan-enabled: ${CT_ORDER_TIMEOUT_SCAN_ENABLED:true}
     timeout-scan-delay-ms: ${CT_ORDER_TIMEOUT_SCAN_DELAY_MS:60000}
+    timeout-message:
+      # 默认关闭，避免未部署 RocketMQ 时影响现有功能；准备好 Proxy 和 DELAY Topic 后再开启。
+      enabled: ${CT_ORDER_TIMEOUT_MESSAGE_ENABLED:false}
+      # RocketMQ 5 gRPC 客户端连接 Proxy，不是连接 NameServer 的 9876 端口。
+      endpoints: ${CT_ROCKETMQ_ENDPOINTS:localhost:8081}
+      topic: ${CT_ROCKETMQ_ORDER_TIMEOUT_TOPIC:campus_trade_order_timeout}
+      tag: ${CT_ROCKETMQ_ORDER_TIMEOUT_TAG:CONFIRM_TIMEOUT}
+      consumer-group: ${CT_ROCKETMQ_ORDER_TIMEOUT_CONSUMER_GROUP:campus_trade_order_timeout_consumer}
+      # 本地 Docker Proxy 默认不启用 TLS；云服务环境按实际配置开启。
+      ssl-enabled: ${CT_ROCKETMQ_SSL_ENABLED:false}
+      request-timeout: ${CT_ROCKETMQ_REQUEST_TIMEOUT:3s}
+      producer-max-attempts: ${CT_ROCKETMQ_PRODUCER_MAX_ATTEMPTS:3}
 
 logging:
   level:

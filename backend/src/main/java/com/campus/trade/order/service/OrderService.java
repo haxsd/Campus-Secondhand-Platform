@@ -10,6 +10,8 @@ import com.campus.trade.order.entity.ProductSnapshot;
 import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.entity.TradeOrderLog;
 import com.campus.trade.order.mapper.OrderMapper;
+import com.campus.trade.order.mq.OrderTimeoutEvent;
+import com.campus.trade.order.mq.OrderTimeoutMessagePublisher;
 import com.campus.trade.order.model.OrderStatus;
 import com.campus.trade.order.vo.OrderCreatedVO;
 import com.campus.trade.order.vo.OrderDetailVO;
@@ -67,6 +69,7 @@ public class OrderService {
     private final ObjectMapper objectMapper;
     private final ReviewMapper reviewMapper;
     private final DisputeMapper disputeMapper;
+    private final OrderTimeoutMessagePublisher timeoutMessagePublisher;
 
     public OrderService(
             OrderMapper orderMapper,
@@ -75,7 +78,8 @@ public class OrderService {
             ProductDetailCacheService productDetailCacheService,
             ObjectMapper objectMapper,
             ReviewMapper reviewMapper,
-            DisputeMapper disputeMapper
+            DisputeMapper disputeMapper,
+            OrderTimeoutMessagePublisher timeoutMessagePublisher
     ) {
         this.orderMapper = orderMapper;
         this.productMapper = productMapper;
@@ -84,6 +88,7 @@ public class OrderService {
         this.objectMapper = objectMapper;
         this.reviewMapper = reviewMapper;
         this.disputeMapper = disputeMapper;
+        this.timeoutMessagePublisher = timeoutMessagePublisher;
     }
 
     /**
@@ -152,6 +157,7 @@ public class OrderService {
             throw conflict("库存不足或商品已变化，请刷新后重试");
         }
         invalidateProductDetailCacheAfterCommit(product.getId());
+        publishTimeoutMessageAfterCommit(order);
         return toCreatedVO(order);
     }
 
@@ -396,6 +402,26 @@ public class OrderService {
             @Override
             public void afterCommit() {
                 productDetailCacheService.invalidate(productId);
+            }
+        });
+    }
+
+    /**
+     * 订单事务提交后发送超时延迟消息。
+     *
+     * <p>事务回滚时不会发送消息；事务已经提交但 MQ 发送失败时，Publisher 只记录错误，
+     * 现有定时扫描会根据 confirm_deadline 补偿关单。</p>
+     */
+    private void publishTimeoutMessageAfterCommit(TradeOrder order) {
+        OrderTimeoutEvent event = OrderTimeoutEvent.create(order.getId(), order.getConfirmDeadline());
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            timeoutMessagePublisher.publish(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                timeoutMessagePublisher.publish(event);
             }
         });
     }

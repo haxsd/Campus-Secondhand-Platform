@@ -131,13 +131,13 @@
     <update id="restoreFromDispute">UPDATE trade_order SET status=#{targetStatus},status_before_dispute=NULL WHERE id=#{id} AND status=5</update>
     <update id="completeFromDispute">UPDATE trade_order SET status=2,status_before_dispute=NULL,finished_at=COALESCE(finished_at,CURRENT_TIMESTAMP) WHERE id=#{id} AND status=5</update>
     <update id="cancelFromDispute">UPDATE trade_order SET status=3,status_before_dispute=NULL WHERE id=#{id} AND status=5</update>
-    <select id="selectExpiredPendingOrders" resultType="com.campus.trade.order.entity.TradeOrder">
-        SELECT <include refid="orderColumns"/> FROM trade_order
-        WHERE status = 0 AND confirm_deadline &lt; CURRENT_TIMESTAMP
+    <select id="selectExpiredPendingOrderIds" resultType="java.lang.Long">
+        SELECT id FROM trade_order
+        WHERE status = 0 AND confirm_deadline &lt;= CURRENT_TIMESTAMP
         ORDER BY confirm_deadline ASC, id ASC LIMIT #{limit}
     </select>
     <update id="timeoutCancelBySystem">
         UPDATE trade_order SET status = 4
-        WHERE id = #{id} AND status = 0 AND confirm_deadline &lt; CURRENT_TIMESTAMP
+        WHERE id = #{id} AND status = 0 AND confirm_deadline &lt;= CURRENT_TIMESTAMP
     </update>
 </mapper>

@@ -27,6 +27,7 @@
         <mybatis-spring-boot.version>3.0.4</mybatis-spring-boot.version>
         <redisson.version>4.6.1</redisson.version>
         <jjwt.version>0.13.0</jjwt.version>
+        <rocketmq-client.version>5.2.0</rocketmq-client.version>
     </properties>
 
     <dependencies>
@@ -78,6 +79,16 @@
             <groupId>org.redisson</groupId>
             <artifactId>redisson</artifactId>
             <version>${redisson.version}</version>
+        </dependency>
+
+        <!--
+            RocketMQ 5.x gRPC 客户端：订单创建后发送精确到期时间的延迟消息。
+            MQ 只负责及时触发超时关单，数据库订单状态仍是事实源，原定时扫描继续承担补偿。
+        -->
+        <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-client-java</artifactId>
+            <version>${rocketmq-client.version}</version>
         </dependency>
 
         <!-- 认证模块使用 BCrypt；不引入完整 Security 自动配置，避免现阶段自动拦截全部接口。 -->

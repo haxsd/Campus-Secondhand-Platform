@@ -26,6 +26,5 @@ class JwtProviderTest {
         assertThat(claims.userId()).isEqualTo(1001L);
         assertThat(claims.role()).isEqualTo(1);
         assertThat(claims.tokenId()).isEqualTo(issuedToken.tokenId());
-        assertThat(issuedToken.ttl()).isEqualTo(Duration.ofMinutes(30));
     }
 }

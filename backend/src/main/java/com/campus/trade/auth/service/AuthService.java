@@ -114,11 +114,8 @@ public class AuthService {
         IssuedToken issuedToken = jwtProvider.issue(user.getId(), user.getRole());
 
         // 第 5 步：把 JWT 的 jti 写入 Redis 白名单。
-        // 后续请求必须同时通过 JWT 验签和 Redis 检查，退出后才能立即失效。
-        loginSessionService.create(
-                issuedToken.tokenId(),
-                issuedToken.ttl()
-        );
+        // Redis 登录态一天无访问会过期，有效访问时自动续期；退出后仍能立即失效。
+        loginSessionService.create(issuedToken.tokenId());
 
         // 第 6 步：组装安全的登录响应。
         // 注意不能返回 User 实体，否则 password 哈希也可能被序列化给前端。

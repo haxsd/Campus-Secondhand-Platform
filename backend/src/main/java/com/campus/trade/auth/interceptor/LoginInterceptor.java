@@ -94,8 +94,8 @@ public class LoginInterceptor implements HandlerInterceptor {
             // 第 4 步：验签、检查签发者和过期时间，并解析 userId、role、jti。
             JwtClaims claims = jwtProvider.parse(token);
 
-            // 第 5 步：查询 Redis 白名单。
-            // JWT 合法但 Redis key 已删除时，说明用户已经退出或 token 被主动吊销。
+            // 第 5 步：检查 Redis 白名单并刷新一天空闲有效期。
+            // JWT 合法但 Redis key 已删除时，说明用户已经退出、长时间未访问或 token 被主动吊销。
             if (!loginSessionService.isActive(claims.tokenId())) {
                 writeFailure(response, ErrorCode.UNAUTHORIZED);
                 return false;

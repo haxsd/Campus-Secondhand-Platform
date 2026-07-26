@@ -71,8 +71,8 @@ public interface OrderMapper {
     int completeFromDispute(@Param("id") Long id);
     int cancelFromDispute(@Param("id") Long id);
 
-    /** 扫描卖家确认期限已过的待确认订单，供定时任务分批处理。 */
-    List<TradeOrder> selectExpiredPendingOrders(@Param("limit") int limit);
+    /** 分批扫描已超过卖家确认期限的待确认订单 ID。 */
+    List<Long> selectExpiredPendingOrderIds(@Param("limit") int limit);
 
     /** 系统超时取消的条件更新；即使扫描结果已过时也不会覆盖卖家刚确认的订单。 */
     int timeoutCancelBySystem(@Param("id") Long id);

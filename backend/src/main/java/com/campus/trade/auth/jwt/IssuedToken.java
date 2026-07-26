@@ -1,15 +1,12 @@
 package com.campus.trade.auth.jwt;
 
-import java.time.Duration;
-
 /**
- * 刚签发的 token 及其 Redis 登录态所需元数据。
+ * 刚签发的 JWT 及其唯一编号。
  *
- * <p>前端只会收到 value；tokenId 和 ttl 是后端写入 Redis 时使用的辅助数据。</p>
+ * <p>前端只会收到 value；tokenId 用于创建 Redis 登录态。</p>
  *
  * @param value   JWT 字符串
  * @param tokenId JWT 唯一标识
- * @param ttl     剩余有效期
  */
-public record IssuedToken(String value, String tokenId, Duration ttl) {
+public record IssuedToken(String value, String tokenId) {
 }

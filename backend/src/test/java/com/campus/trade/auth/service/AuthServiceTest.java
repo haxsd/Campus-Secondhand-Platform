@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.Duration;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,8 +103,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("Abc12345", "bcrypt-hash")).thenReturn(true);
         when(jwtProvider.issue(101L, 0)).thenReturn(new IssuedToken(
                 "jwt-value",
-                "token-id",
-                Duration.ofDays(7)
+                "token-id"
         ));
 
         LoginResponse response = authService.login(new LoginRequest("20260001", "Abc12345"));
@@ -113,7 +111,7 @@ class AuthServiceTest {
         assertThat(response.token()).isEqualTo("jwt-value");
         assertThat(response.user().id()).isEqualTo(101L);
         assertThat(response.user().nickname()).isEqualTo("小明");
-        verify(loginSessionService).create("token-id", Duration.ofDays(7));
+        verify(loginSessionService).create("token-id");
     }
 
     @Test

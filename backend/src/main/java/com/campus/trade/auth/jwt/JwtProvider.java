@@ -69,8 +69,8 @@ public class JwtProvider {
                 .signWith(secretKey)
                 .compact();
 
-        // Redis 保存登录态时还需要 tokenId 和同样的 TTL，因此一起返回给 AuthService。
-        return new IssuedToken(token, tokenId, properties.ttl());
+        // AuthService 还需要 tokenId 创建 Redis 登录态，因此与 JWT 字符串一起返回。
+        return new IssuedToken(token, tokenId);
     }
 
     /**

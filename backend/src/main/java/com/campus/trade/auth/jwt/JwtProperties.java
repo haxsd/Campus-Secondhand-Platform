@@ -12,7 +12,7 @@ import java.time.Duration;
  *
  * @param issuer  签发者，用于拒绝其他系统签发的 token
  * @param secret  HMAC 密钥，HS256 至少需要 32 字节
- * @param ttl     token 与 Redis 登录态的有效期
+ * @param ttl     JWT 最长有效期
  */
 @ConfigurationProperties(prefix = "campus.jwt")
 public record JwtProperties(

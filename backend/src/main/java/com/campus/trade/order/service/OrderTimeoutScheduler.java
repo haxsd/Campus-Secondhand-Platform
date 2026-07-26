@@ -25,6 +25,7 @@ public class OrderTimeoutScheduler {
 
     @Scheduled(fixedDelayString = "${campus.order.timeout-scan-delay-ms:60000}")
     public void cancelExpiredOrders() {
-        orderMapper.selectExpiredPendingOrders(BATCH_SIZE).forEach(timeoutService::cancelIfExpired);
+        // 只扫描 ID，单笔事务内部重新读取订单，避免把扫描阶段的旧对象带进关单逻辑。
+        orderMapper.selectExpiredPendingOrderIds(BATCH_SIZE).forEach(timeoutService::cancelIfExpired);
     }
 }
