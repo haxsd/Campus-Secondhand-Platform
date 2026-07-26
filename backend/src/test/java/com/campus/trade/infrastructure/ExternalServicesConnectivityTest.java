@@ -3,7 +3,7 @@ package com.campus.trade.infrastructure;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -29,7 +29,7 @@ class ExternalServicesConnectivityTest {
     private DataSource dataSource;
 
     @Autowired
-    private RedissonClient redissonClient;
+    private StringRedisTemplate stringRedisTemplate;
 
     @Test
     void shouldConnectToMySqlAndRedis() throws Exception {
@@ -41,7 +41,9 @@ class ExternalServicesConnectivityTest {
             assertThat(resultSet.getInt(1)).isEqualTo(1);
         }
 
-        // count() 会触发一次真实 Redis 请求，但不会创建或删除任何键。
-        assertThat(redissonClient.getKeys().count()).isGreaterThanOrEqualTo(0L);
+        // hasKey() 会触发一次真实 Redis EXISTS 请求，但不会创建或删除任何键。
+        // 使用带随机 UUID 的键，避免测试依赖某个固定键是否恰好被业务写入。
+        String probeKey = "connectivity:probe:" + java.util.UUID.randomUUID();
+        assertThat(stringRedisTemplate.hasKey(probeKey)).isFalse();
     }
 }

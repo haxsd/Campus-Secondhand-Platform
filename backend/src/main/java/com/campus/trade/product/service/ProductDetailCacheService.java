@@ -3,9 +3,7 @@ package com.campus.trade.product.service;
 import com.campus.trade.product.vo.ProductDetailVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.redisson.api.RBucket;
-import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.StringCodec;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -33,11 +31,12 @@ public class ProductDetailCacheService {
     private static final String NULL_VALUE = "__NULL_PRODUCT_DETAIL__";
     private static final Duration NULL_TTL = Duration.ofSeconds(10);
 
-    private final RedissonClient redissonClient;
+    /** 使用字符串模板，让缓存读写直接对应 Redis 的 GET、SET 和 DEL 命令。 */
+    private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
-    public ProductDetailCacheService(RedissonClient redissonClient, ObjectMapper objectMapper) {
-        this.redissonClient = redissonClient;
+    public ProductDetailCacheService(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper) {
+        this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
     }
 
@@ -45,17 +44,18 @@ public class ProductDetailCacheService {
      * 查询 Redis 缓存。hit=false 才表示需要访问数据库；detail=null 且 hit=true 表示空值缓存命中。
      */
     public Lookup lookup(Long productId) {
-        String detailJson = bucket(DETAIL_KEY_PREFIX + productId).get();
+        // 对应 Redis：GET product:detail:{id}。
+        String detailJson = stringRedisTemplate.opsForValue().get(detailKey(productId));
         if (detailJson != null) {
             try {
                 return new Lookup(true, objectMapper.readValue(detailJson, ProductDetailVO.class));
             } catch (JsonProcessingException exception) {
                 // 缓存可能来自旧版本字段或意外损坏；删除后按未命中处理，不让缓存故障影响详情访问。
-                bucket(DETAIL_KEY_PREFIX + productId).delete();
+                stringRedisTemplate.delete(detailKey(productId));
             }
         }
 
-        if (NULL_VALUE.equals(bucket(NULL_KEY_PREFIX + productId).get())) {
+        if (NULL_VALUE.equals(stringRedisTemplate.opsForValue().get(nullKey(productId)))) {
             return new Lookup(true, null);
         }
         return new Lookup(false, null);
@@ -67,7 +67,9 @@ public class ProductDetailCacheService {
     public void putDetail(ProductDetailVO detail) {
         try {
             int randomSeconds = ThreadLocalRandom.current().nextInt(0, 31);
-            bucket(DETAIL_KEY_PREFIX + detail.id()).set(
+            // 对应 Redis：SET product:detail:{id} {json} EX {ttl}。
+            stringRedisTemplate.opsForValue().set(
+                    detailKey(detail.id()),
                     objectMapper.writeValueAsString(detail),
                     Duration.ofMinutes(5).plusSeconds(randomSeconds)
             );
@@ -80,19 +82,26 @@ public class ProductDetailCacheService {
      * 缓存不存在或不可公开商品的结果，TTL 很短，避免商品刚审核通过后长时间仍被判定不存在。
      */
     public void putNull(Long productId) {
-        bucket(NULL_KEY_PREFIX + productId).set(NULL_VALUE, NULL_TTL);
+        // 对应 Redis：SET product:null:{id} __NULL_PRODUCT_DETAIL__ EX 10。
+        stringRedisTemplate.opsForValue().set(nullKey(productId), NULL_VALUE, NULL_TTL);
     }
 
     /**
      * 删除正常详情缓存和空值缓存。写操作提交后调用，保证后续读取能看到最新状态。
      */
     public void invalidate(Long productId) {
-        bucket(DETAIL_KEY_PREFIX + productId).delete();
-        bucket(NULL_KEY_PREFIX + productId).delete();
+        // DEL 支持一次传入多个 key，正常详情缓存和空值缓存必须同时失效。
+        stringRedisTemplate.delete(java.util.List.of(detailKey(productId), nullKey(productId)));
     }
 
-    private RBucket<String> bucket(String key) {
-        return redissonClient.getBucket(key, StringCodec.INSTANCE);
+    /** 构造正常商品详情缓存键。 */
+    private String detailKey(Long productId) {
+        return DETAIL_KEY_PREFIX + productId;
+    }
+
+    /** 构造“不存在/不可公开”商品的短期空值缓存键。 */
+    private String nullKey(Long productId) {
+        return NULL_KEY_PREFIX + productId;
     }
 
     /**

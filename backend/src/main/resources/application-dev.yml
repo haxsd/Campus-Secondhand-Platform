@@ -1,6 +1,6 @@
 spring:
   datasource:
-    # 所有本地参数都可以通过 CT_* 环境变量覆盖，默认值对应当前 Docker 环境。
+    # 所有本地参数均可通过 CT_* 环境变量覆盖；默认值对应当前 Docker 环境。
     url: jdbc:mysql://${CT_DB_HOST:localhost}:${CT_DB_PORT:3306}/${CT_DB_NAME:campus_trade}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: ${CT_DB_USERNAME:root}
     password: ${CT_DB_PASSWORD:root123}
@@ -11,18 +11,19 @@ spring:
       maximum-pool-size: 10
       connection-timeout: 3000
       validation-timeout: 1000
+  data:
+    redis:
+      # Spring Boot 自动据此创建 StringRedisTemplate；业务代码直接使用 Redis 的字符串命令。
+      host: ${CT_REDIS_HOST:localhost}
+      port: ${CT_REDIS_PORT:6379}
+      database: ${CT_REDIS_DATABASE:0}
+      password: ${CT_REDIS_PASSWORD:}
+      connect-timeout: 3s
 
 campus:
   file:
-    # 第一版本地上传目录；生产环境可通过环境变量改为挂载卷目录，或替换为 OSS 实现。
+    # 第一版本地上传目录；生产环境可用环境变量改为挂载卷目录，或替换为 OSS 实现。
     upload-dir: ${CT_UPLOAD_DIR:uploads}
-  redis:
-    # Redis 当前运行在本机 Docker；部署后可用环境变量改成容器服务名。
-    host: ${CT_REDIS_HOST:localhost}
-    port: ${CT_REDIS_PORT:6379}
-    database: ${CT_REDIS_DATABASE:0}
-    password: ${CT_REDIS_PASSWORD:}
-    connect-timeout: 3s
   jwt:
     # issuer 会写入 JWT 的 iss，并在解析时强制核对。
     issuer: campus-trade

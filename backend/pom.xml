@@ -55,6 +55,15 @@
             <version>${mybatis-spring-boot.version}</version>
         </dependency>
 
+        <!--
+            Spring Data Redis 会自动配置 StringRedisTemplate。
+            当前登录态和商品缓存只需要 Redis 字符串的 GET / SET / DEL，因此使用它能让代码与 Redis 命令一一对应。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
@@ -62,8 +71,8 @@
         </dependency>
 
         <!--
-            当前只依赖 Redisson 核心并自行创建 RedissonClient。
-            这样既满足后续分布式锁、缓存和登录态需求，也避免引入暂时用不到的 Spring Data Redis。
+            当前业务代码不依赖 Redisson；保留此依赖作为以后确实需要分布式锁、限流器或高级分布式对象时的选择。
+            在需求出现前不创建 RedissonClient，避免为简单的字符串读写引入额外抽象。
         -->
         <dependency>
             <groupId>org.redisson</groupId>
