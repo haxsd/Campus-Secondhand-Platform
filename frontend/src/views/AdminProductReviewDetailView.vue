@@ -48,7 +48,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div v-loading="loading" class="review-detail">
+  <div v-loading="loading" class="page review-detail">
     <el-button @click="router.push('/admin/products')">返回审核列表</el-button>
     <el-card v-if="detail" class="card" shadow="never">
       <template #header>审核商品：{{ detail.title }}</template>
@@ -79,9 +79,9 @@ onMounted(load)
 </template>
 
 <style scoped>
-.review-detail { padding: 16px 0; max-width: 900px; margin: 0 auto; }
+.review-detail { max-width: 900px; }
 .card { margin-top: 16px; }
-.images { background: #f5f7fa; }
+.images { background: var(--app-bg-soft); border-radius: 12px; overflow: hidden; }
 .image { width: 100%; height: 100%; }
 .image-index { position: absolute; right: 16px; bottom: 12px; color: #fff; background: rgb(0 0 0 / 45%); padding: 3px 8px; border-radius: 10px; }
 .info { margin-top: 20px; }

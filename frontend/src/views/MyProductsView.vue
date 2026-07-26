@@ -87,9 +87,10 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div class="my-products">
+  <div class="page my-products">
+    <h2 class="page-title">我的商品</h2>
+
     <el-card shadow="never">
-      <template #header>我的商品</template>
 
       <!-- 状态筛选 -->
       <el-tabs v-model="activeStatus" @tab-change="onTabChange">
@@ -192,15 +193,15 @@ onMounted(loadList)
 </template>
 
 <style scoped>
-.my-products {
-  padding: 16px 0;
+.my-products :deep(.el-card__body) {
+  padding-top: 10px;
 }
 
 .cover,
 .cover-ph {
   width: 60px;
   height: 60px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .cover-ph {
@@ -212,13 +213,13 @@ onMounted(loadList)
 }
 
 .price {
-  color: #f56c6c;
-  font-weight: bold;
+  color: var(--app-price);
+  font-weight: 700;
 }
 
 .reason-icon {
   margin-left: 4px;
-  color: #f56c6c;
+  color: var(--el-color-danger);
   vertical-align: middle;
   cursor: help;
 }
@@ -232,11 +233,11 @@ onMounted(loadList)
 .stock-tip {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .no-action {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 </style>

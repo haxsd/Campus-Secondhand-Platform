@@ -27,8 +27,8 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div class="admin-review">
-    <h2 class="title">商品审核</h2>
+  <div class="page admin-review">
+    <h2 class="page-title">商品审核</h2>
 
     <el-table v-loading="loading" :data="list" border stripe>
       <el-table-column label="封面" width="90">
@@ -70,23 +70,14 @@ onMounted(loadList)
 </template>
 
 <style scoped>
-.admin-review {
-  padding: 16px 0;
-}
-
-.title {
-  margin: 0 0 16px;
-  font-size: 20px;
-}
-
 .cover {
   width: 56px;
   height: 56px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .price {
-  color: #f56c6c;
-  font-weight: bold;
+  color: var(--app-price);
+  font-weight: 700;
 }
 </style>

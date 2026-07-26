@@ -118,9 +118,10 @@ onMounted(loadProfile)
 </script>
 
 <template>
-  <div v-loading="loading" class="profile-page">
+  <div v-loading="loading" class="page profile-page">
+    <h2 class="page-title">个人中心</h2>
+
     <el-card shadow="never">
-      <template #header>个人中心</template>
 
       <el-tabs>
         <el-tab-pane label="个人资料">
@@ -191,9 +192,7 @@ onMounted(loadProfile)
 
 <style scoped>
 .profile-page {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 16px 0;
+  max-width: 800px;
 }
 
 .profile-form,
@@ -208,7 +207,7 @@ onMounted(loadProfile)
 
 .field-tip {
   margin-top: 4px;
-  color: #909399;
+  color: var(--app-text-3);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -225,10 +224,6 @@ onMounted(loadProfile)
 
 /* 窄屏时改为“标签在上、控件在下”，避免输入框被过度压缩。 */
 @media (max-width: 600px) {
-  .profile-page {
-    padding: 12px 0;
-  }
-
   :deep(.el-form-item) {
     display: block;
   }

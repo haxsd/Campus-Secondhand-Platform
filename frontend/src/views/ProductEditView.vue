@@ -137,9 +137,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-loading="pageLoading" class="edit-page">
+  <div v-loading="pageLoading" class="page edit-page">
+    <h2 class="page-title">{{ isEdit ? '编辑商品' : '发布闲置' }}</h2>
+
     <el-card shadow="never">
-      <template #header>{{ isEdit ? '编辑商品' : '发布闲置' }}</template>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" class="edit-form">
         <el-form-item label="标题" prop="title">
@@ -213,9 +214,7 @@ onMounted(async () => {
 
 <style scoped>
 .edit-page {
-  padding: 16px 0;
-  max-width: 760px;
-  margin: 0 auto;
+  max-width: 800px;
 }
 
 .edit-form {
@@ -224,7 +223,7 @@ onMounted(async () => {
 
 .unit {
   margin-left: 8px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .w220 {
