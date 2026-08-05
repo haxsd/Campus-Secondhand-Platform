@@ -1,0 +1,93 @@
+services:
+  namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-namesrv
+    restart: unless-stopped
+    command: ["sh", "mqnamesrv"]
+    ports:
+      - "${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    volumes:
+      - campus-trade-namesrv-logs:/home/rocketmq/logs
+
+  rocketmq-permissions:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-rocketmq-permissions
+    user: "0:0"
+    depends_on:
+      namesrv:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /home/rocketmq/store /home/rocketmq/broker-logs
+        /home/rocketmq/proxy-logs /home/rocketmq/namesrv-logs &&
+        chown -R 3000:3000 /home/rocketmq/store /home/rocketmq/broker-logs
+        /home/rocketmq/proxy-logs /home/rocketmq/namesrv-logs
+    volumes:
+      - campus-trade-broker-store:/home/rocketmq/store
+      - campus-trade-broker-logs:/home/rocketmq/broker-logs
+      - campus-trade-proxy-logs:/home/rocketmq/proxy-logs
+      - campus-trade-namesrv-logs:/home/rocketmq/namesrv-logs
+
+  broker:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-broker
+    restart: unless-stopped
+    depends_on:
+      rocketmq-permissions:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "sh mqbroker -c /home/rocketmq/rocketmq-5.3.2/conf/broker.conf; tail -f /dev/null"]
+    ports:
+      - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${ROCKETMQ_BROKER_HA_PORT:-10912}:10912"
+    volumes:
+      - ./broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf:ro
+      - campus-trade-broker-store:/home/rocketmq/store
+      - campus-trade-broker-logs:/home/rocketmq/logs
+
+  topic-init:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-topic-init
+    restart: "no"
+    depends_on:
+      broker:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - >-
+        until sh mqadmin clusterList -n namesrv:9876 | grep -q broker-a;
+        do sleep 2; done;
+        if sh mqadmin topicList -n namesrv:9876 | grep -qx
+        campus_trade_order_timeout; then exit 0; fi;
+        sh mqadmin updateTopic -n namesrv:9876
+        -t campus_trade_order_timeout -c DefaultCluster
+        -a '+message.type=DELAY'
+
+  proxy:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-proxy
+    restart: unless-stopped
+    depends_on:
+      namesrv:
+        condition: service_started
+      broker:
+        condition: service_started
+      topic-init:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "sh mqproxy -n namesrv:9876; tail -f /dev/null"]
+    ports:
+      - "${ROCKETMQ_PROXY_PORT:-8081}:8081"
+    volumes:
+      - campus-trade-proxy-logs:/home/rocketmq/logs
+
+volumes:
+  campus-trade-namesrv-logs:
+    name: deploy_campus-trade-namesrv-logs
+  campus-trade-broker-store:
+    name: deploy_campus-trade-broker-store
+  campus-trade-broker-logs:
+    name: deploy_campus-trade-broker-logs
+  campus-trade-proxy-logs:
+    name: deploy_campus-trade-proxy-logs

@@ -18,8 +18,11 @@ New-Item -ItemType Directory -Path $uploadDir -Force | Out-Null
 
 Push-Location $ProjectRoot
 try {
-    docker compose --env-file $EnvFile --profile rocketmq --profile production -f deploy/docker-compose.yml up -d
-    if ($LASTEXITCODE -ne 0) { throw "Dependency startup failed with exit code $LASTEXITCODE" }
+    docker compose --env-file $EnvFile --profile production -f deploy/docker-compose.yml up -d
+    if ($LASTEXITCODE -ne 0) { throw "MySQL, Redis or nginx startup failed with exit code $LASTEXITCODE" }
+
+    docker compose --env-file $EnvFile -f rocketmq/docker-compose.yml up -d
+    if ($LASTEXITCODE -ne 0) { throw "RocketMQ startup failed with exit code $LASTEXITCODE" }
 
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         $topicStatus = docker inspect campus-trade-topic-init --format '{{.State.Status}} {{.State.ExitCode}}' 2>$null
