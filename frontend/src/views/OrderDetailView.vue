@@ -176,184 +176,185 @@ onMounted(loadDetail)
 </script>
 
 <template>
-  <div v-loading="loading" class="order-detail">
-    <!-- 订单不存在 -->
-    <el-result
-      v-if="notFound"
-      icon="warning"
-      title="订单不存在"
-      sub-title="订单可能已被删除，或你没有查看权限"
-    >
-      <template #extra>
-        <el-button type="primary" @click="$router.push('/my/orders')">返回我的订单</el-button>
-      </template>
-    </el-result>
+  <div v-loading="loading" class="page">
+    <div class="order-detail">
+      <!-- 订单不存在 -->
+      <el-result
+        v-if="notFound"
+        icon="warning"
+        title="订单不存在"
+        sub-title="订单可能已被删除，或你没有查看权限"
+      >
+        <template #extra>
+          <el-button type="primary" @click="$router.push('/my/orders')">返回我的订单</el-button>
+        </template>
+      </el-result>
 
-    <template v-else-if="order">
-      <!-- 头部：订单号 + 状态 -->
-      <el-card shadow="never" class="block">
-        <div class="head">
-          <div>
-            <div class="order-no">订单号：{{ order.orderNo }}</div>
-            <div class="created">下单时间：{{ order.createdAt }}</div>
+      <template v-else-if="order">
+        <!-- 头部：订单号 + 状态 -->
+        <el-card shadow="never" class="block">
+          <div class="head">
+            <div>
+              <div class="order-no">订单号 {{ order.orderNo }}</div>
+              <div class="created">下单时间：{{ order.createdAt }}</div>
+            </div>
+            <OrderStatusTag :status="order.status" />
           </div>
-          <OrderStatusTag :status="order.status" />
-        </div>
-      </el-card>
+        </el-card>
 
-      <!-- 商品快照 -->
-      <el-card shadow="never" class="block">
-        <template #header>商品信息（下单时快照）</template>
-        <div class="snapshot">
-          <el-image
-            class="snap-img"
-            :src="order.snapshot.images?.[0]"
-            fit="cover"
-            :preview-src-list="order.snapshot.images || []"
-          />
-          <div class="snap-info">
-            <div class="snap-title">{{ order.snapshot.title }}</div>
-            <div class="snap-price">¥{{ order.snapshot.price }}</div>
-            <div class="snap-meta">
-              成色：{{ statusLabel(ITEM_CONDITION, order.snapshot.itemCondition) }} ·
-              {{ order.snapshot.campus }}
+        <!-- 商品快照 -->
+        <el-card shadow="never" class="block">
+          <template #header>商品信息（下单时快照）</template>
+          <div class="snapshot">
+            <el-image
+              class="snap-img"
+              :src="order.snapshot.images?.[0]"
+              fit="cover"
+              :preview-src-list="order.snapshot.images || []"
+            />
+            <div class="snap-info">
+              <div class="snap-title">{{ order.snapshot.title }}</div>
+              <div class="snap-price"><span class="symbol">¥</span>{{ order.snapshot.price }}</div>
+              <div class="snap-meta">
+                成色：{{ statusLabel(ITEM_CONDITION, order.snapshot.itemCondition) }} ·
+                {{ order.snapshot.campus }}
+              </div>
             </div>
           </div>
+        </el-card>
+
+        <!-- 交易信息 -->
+        <el-card shadow="never" class="block">
+          <template #header>交易信息</template>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="单价">¥{{ order.unitPrice }}</el-descriptions-item>
+            <el-descriptions-item label="数量">{{ order.quantity }}</el-descriptions-item>
+            <el-descriptions-item label="应付总额">
+              <span class="total">¥{{ order.totalAmount }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="订单状态">
+              {{ statusLabel(ORDER_STATUS, order.status) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="买家">{{ order.buyer.nickname }}</el-descriptions-item>
+            <el-descriptions-item label="卖家">{{ order.seller.nickname }}</el-descriptions-item>
+            <el-descriptions-item label="约定交易时间">{{ order.tradeTime }}</el-descriptions-item>
+            <el-descriptions-item label="交易地点">{{ order.tradePlace }}</el-descriptions-item>
+            <el-descriptions-item label="确认截止">{{ order.confirmDeadline }}</el-descriptions-item>
+            <el-descriptions-item label="完成时间">{{
+              order.finishedAt || '—'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="买家备注" :span="2">
+              {{ order.remark || '—' }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+
+        <!-- 状态时间线 -->
+        <el-card shadow="never" class="block">
+          <template #header>状态记录</template>
+          <el-timeline v-if="order.logs?.length">
+            <el-timeline-item
+              v-for="(log, i) in order.logs"
+              :key="i"
+              :timestamp="log.createdAt"
+              :type="statusType(ORDER_STATUS, log.toStatus)"
+            >
+              {{ OPERATOR_LABEL[log.operatorType] }} 将订单变更为「{{
+                statusLabel(ORDER_STATUS, log.toStatus)
+              }}」
+              <span v-if="log.reason" class="log-reason">（原因：{{ log.reason }}）</span>
+            </el-timeline-item>
+          </el-timeline>
+          <el-empty v-else description="暂无状态记录" :image-size="60" />
+        </el-card>
+
+        <!-- 操作区：按 can* 标记显示 -->
+        <div class="actions">
+          <el-button v-if="order.canConfirm" type="primary" :loading="acting" @click="onConfirm">
+            确认订单
+          </el-button>
+          <el-button v-if="order.canComplete" type="success" :loading="acting" @click="onComplete">
+            确认完成
+          </el-button>
+          <el-button v-if="order.canCancel" :loading="acting" @click="onCancel">取消订单</el-button>
+          <el-button v-if="order.canReview" type="warning" @click="openReview">评价</el-button>
+          <el-button v-if="order.canDispute" type="danger" plain @click="openDispute">
+            发起纠纷
+          </el-button>
         </div>
-      </el-card>
-
-      <!-- 交易信息 -->
-      <el-card shadow="never" class="block">
-        <template #header>交易信息</template>
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="单价">¥{{ order.unitPrice }}</el-descriptions-item>
-          <el-descriptions-item label="数量">{{ order.quantity }}</el-descriptions-item>
-          <el-descriptions-item label="应付总额">
-            <span class="total">¥{{ order.totalAmount }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="订单状态">
-            {{ statusLabel(ORDER_STATUS, order.status) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="买家">{{ order.buyer.nickname }}</el-descriptions-item>
-          <el-descriptions-item label="卖家">{{ order.seller.nickname }}</el-descriptions-item>
-          <el-descriptions-item label="约定交易时间">{{ order.tradeTime }}</el-descriptions-item>
-          <el-descriptions-item label="交易地点">{{ order.tradePlace }}</el-descriptions-item>
-          <el-descriptions-item label="确认截止">{{ order.confirmDeadline }}</el-descriptions-item>
-          <el-descriptions-item label="完成时间">{{
-            order.finishedAt || '—'
-          }}</el-descriptions-item>
-          <el-descriptions-item label="买家备注" :span="2">
-            {{ order.remark || '—' }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </el-card>
-
-      <!-- 状态时间线 -->
-      <el-card shadow="never" class="block">
-        <template #header>状态记录</template>
-        <el-timeline v-if="order.logs?.length">
-          <el-timeline-item
-            v-for="(log, i) in order.logs"
-            :key="i"
-            :timestamp="log.createdAt"
-            :type="statusType(ORDER_STATUS, log.toStatus)"
-          >
-            {{ OPERATOR_LABEL[log.operatorType] }} 将订单变更为「{{
-              statusLabel(ORDER_STATUS, log.toStatus)
-            }}」
-            <span v-if="log.reason" class="log-reason">（原因：{{ log.reason }}）</span>
-          </el-timeline-item>
-        </el-timeline>
-        <el-empty v-else description="暂无状态记录" :image-size="60" />
-      </el-card>
-
-      <!-- 操作区：按 can* 标记显示 -->
-      <div class="actions">
-        <el-button v-if="order.canConfirm" type="primary" :loading="acting" @click="onConfirm">
-          确认订单
-        </el-button>
-        <el-button v-if="order.canComplete" type="success" :loading="acting" @click="onComplete">
-          确认完成
-        </el-button>
-        <el-button v-if="order.canCancel" :loading="acting" @click="onCancel">取消订单</el-button>
-        <el-button v-if="order.canReview" type="warning" @click="openReview">评价</el-button>
-        <el-button v-if="order.canDispute" type="danger" plain @click="openDispute">
-          发起纠纷
-        </el-button>
-      </div>
-    </template>
-
-    <!-- 评价 dialog -->
-    <el-dialog v-model="reviewVisible" title="评价交易" width="460px">
-      <el-form label-width="72px">
-        <el-form-item label="评分">
-          <el-rate v-model="reviewForm.rating" />
-        </el-form-item>
-        <el-form-item label="标签">
-          <el-checkbox-group v-model="reviewForm.tags">
-            <el-checkbox v-for="t in REVIEW_TAGS" :key="t" :value="t" :label="t" />
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="评价内容">
-          <el-input
-            v-model="reviewForm.content"
-            type="textarea"
-            :rows="3"
-            maxlength="200"
-            show-word-limit
-            placeholder="说说这次交易体验（选填）"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="reviewVisible = false">取消</el-button>
-        <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">
-          提交评价
-        </el-button>
       </template>
-    </el-dialog>
 
-    <!-- 纠纷 dialog -->
-    <el-dialog v-model="disputeVisible" title="发起纠纷" width="500px">
-      <el-form label-width="72px">
-        <el-form-item label="纠纷类型">
-          <el-select v-model="disputeForm.reasonType" class="full">
-            <el-option
-              v-for="o in disputeReasonOptions"
-              :key="o.value"
-              :label="o.label"
-              :value="o.value"
+      <!-- 评价 dialog -->
+      <el-dialog v-model="reviewVisible" title="评价交易" width="460px">
+        <el-form label-width="72px">
+          <el-form-item label="评分">
+            <el-rate v-model="reviewForm.rating" />
+          </el-form-item>
+          <el-form-item label="标签">
+            <el-checkbox-group v-model="reviewForm.tags">
+              <el-checkbox v-for="t in REVIEW_TAGS" :key="t" :value="t" :label="t" />
+            </el-checkbox-group>
+          </el-form-item>
+          <el-form-item label="评价内容">
+            <el-input
+              v-model="reviewForm.content"
+              type="textarea"
+              :rows="3"
+              maxlength="200"
+              show-word-limit
+              placeholder="说说这次交易体验（选填）"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="问题说明">
-          <el-input
-            v-model="disputeForm.statement"
-            type="textarea"
-            :rows="4"
-            maxlength="500"
-            show-word-limit
-            placeholder="详细描述遇到的问题，便于管理员判断"
-          />
-        </el-form-item>
-        <el-form-item label="证据图片">
-          <ImageUploader v-model="disputeForm.evidence" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="disputeVisible = false">取消</el-button>
-        <el-button type="danger" :loading="disputeSubmitting" @click="submitDispute">
-          提交纠纷
-        </el-button>
-      </template>
-    </el-dialog>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="reviewVisible = false">取消</el-button>
+          <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">
+            提交评价
+          </el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 纠纷 dialog -->
+      <el-dialog v-model="disputeVisible" title="发起纠纷" width="500px">
+        <el-form label-width="72px">
+          <el-form-item label="纠纷类型">
+            <el-select v-model="disputeForm.reasonType" class="full">
+              <el-option
+                v-for="o in disputeReasonOptions"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="问题说明">
+            <el-input
+              v-model="disputeForm.statement"
+              type="textarea"
+              :rows="4"
+              maxlength="500"
+              show-word-limit
+              placeholder="详细描述遇到的问题，便于管理员判断"
+            />
+          </el-form-item>
+          <el-form-item label="证据图片">
+            <ImageUploader v-model="disputeForm.evidence" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="disputeVisible = false">取消</el-button>
+          <el-button type="danger" :loading="disputeSubmitting" @click="submitDispute">
+            提交纠纷
+          </el-button>
+        </template>
+      </el-dialog>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .order-detail {
-  padding: 16px 0;
-  max-width: 800px;
+  max-width: 860px;
   margin: 0 auto;
 }
 
@@ -365,15 +366,19 @@ onMounted(loadDetail)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .order-no {
-  font-weight: bold;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--app-text-1);
+  letter-spacing: 0.3px;
 }
 
 .created {
   font-size: 13px;
-  color: #909399;
+  color: var(--app-text-3);
   margin-top: 4px;
 }
 
@@ -385,40 +390,47 @@ onMounted(loadDetail)
 .snap-img {
   width: 100px;
   height: 100px;
-  border-radius: 6px;
+  border-radius: 10px;
   flex-shrink: 0;
+  background: var(--app-bg-soft);
 }
 
 .snap-title {
   font-size: 15px;
-  color: #303133;
+  font-weight: 600;
+  color: var(--app-text-1);
 }
 
 .snap-price {
-  color: #f56c6c;
-  font-size: 18px;
-  font-weight: bold;
+  color: var(--app-price);
+  font-size: 19px;
+  font-weight: 700;
   margin: 6px 0;
+}
+
+.snap-price .symbol {
+  font-size: 13px;
 }
 
 .snap-meta {
   font-size: 13px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .total {
-  color: #f56c6c;
-  font-weight: bold;
+  color: var(--app-price);
+  font-weight: 700;
 }
 
 .log-reason {
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  padding: 4px 0 8px;
 }
 
 .full {

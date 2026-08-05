@@ -63,10 +63,10 @@ onMounted(loadOrders)
 </script>
 
 <template>
-  <div class="my-orders">
-    <el-card shadow="never">
-      <template #header>我的订单</template>
+  <div class="page my-orders">
+    <h2 class="page-title">我的订单</h2>
 
+    <el-card shadow="never">
       <!-- 角色切换 -->
       <el-tabs v-model="role" @tab-change="onRoleChange">
         <el-tab-pane label="我买到的" name="buyer" />
@@ -91,7 +91,7 @@ onMounted(loadOrders)
           <template #default="{ row }">
             <div class="cell-product">
               <span class="p-title">{{ row.snapshot.title }}</span>
-              <span class="p-price">¥{{ row.snapshot.price }}</span>
+              <span class="p-price">单价 ¥{{ row.snapshot.price }}</span>
             </div>
           </template>
         </el-table-column>
@@ -139,12 +139,12 @@ onMounted(loadOrders)
 </template>
 
 <style scoped>
-.my-orders {
-  padding: 16px 0;
+.my-orders :deep(.el-card__body) {
+  padding-top: 10px;
 }
 
 .filter {
-  margin-bottom: 12px;
+  margin: 4px 0 14px;
 }
 
 .w160 {
@@ -158,17 +158,18 @@ onMounted(loadOrders)
 }
 
 .p-title {
-  color: #303133;
+  color: var(--app-text-1);
+  font-weight: 500;
 }
 
 .p-price {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .total {
-  color: #f56c6c;
-  font-weight: bold;
+  color: var(--app-price);
+  font-weight: 700;
 }
 
 .pager {

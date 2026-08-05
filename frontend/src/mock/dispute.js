@@ -86,18 +86,31 @@ if (seedDisputedOrder) {
 
 // ===== 管理端：纠纷处理 =====
 
-// GET /api/admin/disputes —— 纠纷列表（可按 status 筛选 + 分页）
+// GET /api/admin/disputes —— 纠纷列表（可按 status 筛选 + (createdAt, id) 游标分页）
 // 列表项额外带上订单号/商品标题/买卖双方，方便管理员一眼看清是哪单。
 export function mockGetDisputes(params = {}) {
-  const { status, page = 1, pageSize = 10 } = params
+  const { status, cursorCreatedAt, cursorId, pageSize = 10 } = params
   let filtered = MOCK_DISPUTES.slice()
   if (status !== undefined && status !== null && status !== '') {
     filtered = filtered.filter((d) => d.status === Number(status))
   }
-  filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  const total = filtered.length
-  const start = (page - 1) * pageSize
-  const list = filtered.slice(start, start + pageSize).map((d) => {
+  // createdAt 相同时按 id 倒序，必须与后端 SQL 的稳定排序规则一致。
+  filtered.sort((a, b) => {
+    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1
+    return Number(b.id) - Number(a.id)
+  })
+  if (cursorCreatedAt && cursorId) {
+    filtered = filtered.filter(
+      (d) =>
+        d.createdAt < cursorCreatedAt ||
+        (d.createdAt === cursorCreatedAt && Number(d.id) < Number(cursorId)),
+    )
+  }
+  // 多取一条只用于判断 hasNext，不返回给页面。
+  const rows = filtered.slice(0, Number(pageSize) + 1)
+  const hasNext = rows.length > pageSize
+  const currentRows = hasNext ? rows.slice(0, pageSize) : rows
+  const list = currentRows.map((d) => {
     const o = findOrder(d.orderId)
     return {
       ...d,
@@ -108,7 +121,13 @@ export function mockGetDisputes(params = {}) {
       orderStatus: o?.status,
     }
   })
-  return delay({ list, total, page, pageSize })
+  const last = currentRows[currentRows.length - 1]
+  return delay({
+    list,
+    hasNext,
+    nextCursorCreatedAt: hasNext ? last.createdAt : null,
+    nextCursorId: hasNext ? last.id : null,
+  })
 }
 
 // POST /api/admin/disputes/{id}/handle —— 管理员处理

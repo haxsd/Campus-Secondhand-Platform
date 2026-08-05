@@ -31,8 +31,8 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div class="history">
-    <h2 class="title">浏览记录</h2>
+  <div class="page history">
+    <h2 class="page-title">浏览记录</h2>
 
     <div v-loading="loading" class="grid-wrap">
       <el-row v-if="list.length" :gutter="16">
@@ -62,12 +62,7 @@ onMounted(loadList)
 
 <style scoped>
 .history {
-  padding: 16px 0;
-}
-
-.title {
-  margin: 0 0 16px;
-  font-size: 20px;
+  min-height: 46vh;
 }
 
 .grid-item {
@@ -75,9 +70,10 @@ onMounted(loadList)
 }
 
 .view-time {
-  margin-top: 6px;
+  margin-top: 8px;
+  padding-left: 2px;
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 
 .pager {

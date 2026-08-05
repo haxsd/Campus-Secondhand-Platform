@@ -24,7 +24,7 @@ export function reviewProduct(id, data) {
   return post(`/admin/products/${id}/review`, data)
 }
 
-// GET /api/admin/disputes —— 纠纷列表（params: { status, page, pageSize }）
+// GET /api/admin/disputes —— 纠纷列表（params: { status, cursorCreatedAt, cursorId, pageSize }）
 export function getDisputes(params) {
   if (useMock) return mockGetDisputes(params)
   return get('/admin/disputes', params)

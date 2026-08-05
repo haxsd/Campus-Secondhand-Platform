@@ -95,23 +95,21 @@ onMounted(loadProduct)
 </script>
 
 <template>
-  <div v-loading="loading" class="order-create">
-    <el-card v-if="product" shadow="never">
-      <template #header>确认下单</template>
+  <div v-loading="loading" class="page order-create">
+    <h2 class="page-title">确认下单</h2>
 
-      <!-- 商品摘要 -->
+    <div v-if="product" class="panel">
+      <!-- 商品摘要：薄荷底的小卡片 -->
       <div class="summary">
         <el-image :src="product.cover || product.images?.[0]" fit="cover" class="cover" />
         <div class="summary-info">
           <p class="title">{{ product.title }}</p>
-          <p class="price">单价 ¥{{ product.price }}</p>
+          <p class="price"><span class="symbol">¥</span>{{ product.price }}</p>
           <p class="stock">库存 {{ product.stock }} 件</p>
         </div>
       </div>
 
-      <el-divider />
-
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" class="order-form">
         <el-form-item label="购买数量" prop="quantity">
           <el-input-number v-model="form.quantity" :min="1" :max="product.stock" :step="1" />
         </el-form-item>
@@ -139,54 +137,92 @@ onMounted(loadProduct)
         </el-form-item>
 
         <el-form-item label="应付金额">
-          <span class="total">¥{{ totalAmount }}</span>
+          <span class="total"><span class="symbol">¥</span>{{ totalAmount }}</span>
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" :loading="submitting" @click="onSubmit">提交订单</el-button>
-          <el-button @click="router.back()">返回</el-button>
+          <el-button type="primary" size="large" class="submit-btn" :loading="submitting" @click="onSubmit">
+            提交订单
+          </el-button>
+          <el-button size="large" @click="router.back()">返回</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .order-create {
-  padding: 16px 0;
-  max-width: 680px;
-  margin: 0 auto;
+  max-width: 720px;
 }
 
+.panel {
+  background: #fff;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  box-shadow: var(--app-shadow-sm);
+  padding: 22px 24px;
+}
+
+/* 商品摘要 */
 .summary {
   display: flex;
   gap: 16px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--app-bg-soft);
+  border: 1px solid #ddf2e8;
+  margin-bottom: 22px;
 }
 
 .cover {
   width: 96px;
   height: 96px;
-  border-radius: 6px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
 .summary-info .title {
-  margin: 0 0 8px;
+  margin: 2px 0 8px;
   font-size: 16px;
-  color: #303133;
+  font-weight: 600;
+  color: var(--app-text-1);
 }
 
-.summary-info .price,
-.summary-info .stock {
-  margin: 4px 0;
-  color: #909399;
+.summary-info .price {
+  margin: 0 0 4px;
+  color: var(--app-price);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.summary-info .price .symbol {
   font-size: 13px;
 }
 
+.summary-info .stock {
+  margin: 0;
+  color: var(--app-text-3);
+  font-size: 13px;
+}
+
+/* 应付金额 */
 .total {
-  color: #f56c6c;
-  font-size: 22px;
-  font-weight: bold;
+  color: var(--app-price);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.total .symbol {
+  font-size: 15px;
+  font-weight: 600;
+  margin-right: 1px;
+}
+
+.submit-btn {
+  min-width: 140px;
+  font-weight: 600;
 }
 
 .w280 {

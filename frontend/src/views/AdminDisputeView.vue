@@ -7,9 +7,15 @@ import { getDisputes, handleDispute } from '@/api/admin'
 import { DISPUTE_STATUS, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 
 const list = ref([])
-const total = ref(0)
 const loading = ref(false)
-const query = reactive({ status: '', page: 1, pageSize: 10 })
+const query = reactive({ status: '', pageSize: 10 })
+
+// 游标历史只保存在当前页面内：可以连续上一页/下一页，但不支持跳转到未知的第 N 页。
+// 每一项都是“请求这一页时使用的游标”，首项 null 表示从最新纠纷开始读取。
+const cursorHistory = ref([null])
+const cursorIndex = ref(0)
+const hasNext = ref(false)
+const nextCursor = ref(null)
 
 // 状态筛选下拉：全部 + 各纠纷状态
 const statusOptions = Object.entries(DISPUTE_STATUS).map(([value, { label }]) => ({
@@ -28,16 +34,47 @@ const ACTION_OPTIONS = [
 async function loadList() {
   loading.value = true
   try {
-    const res = await getDisputes({ ...query })
+    const cursor = cursorHistory.value[cursorIndex.value]
+    const params = { status: query.status, pageSize: query.pageSize }
+    if (cursor) {
+      params.cursorCreatedAt = cursor.createdAt
+      params.cursorId = cursor.id
+    }
+    const res = await getDisputes(params)
     list.value = res.list
-    total.value = res.total
+    hasNext.value = res.hasNext
+    nextCursor.value = res.hasNext
+      ? { createdAt: res.nextCursorCreatedAt, id: res.nextCursorId }
+      : null
   } finally {
     loading.value = false
   }
 }
 
 function onFilterChange() {
-  query.page = 1
+  resetCursorPaging()
+  loadList()
+}
+
+function resetCursorPaging() {
+  cursorHistory.value = [null]
+  cursorIndex.value = 0
+  hasNext.value = false
+  nextCursor.value = null
+}
+
+function previousPage() {
+  if (cursorIndex.value === 0) return
+  cursorIndex.value -= 1
+  loadList()
+}
+
+function nextPage() {
+  if (!hasNext.value || !nextCursor.value) return
+  // 当前页发生过筛选或刷新后，历史中的“未来页”游标不再可信，先截断再追加。
+  cursorHistory.value.splice(cursorIndex.value + 1)
+  cursorHistory.value.push(nextCursor.value)
+  cursorIndex.value += 1
   loadList()
 }
 
@@ -64,10 +101,13 @@ async function submitHandle() {
     await handleDispute(current.value.id, payload)
     ElMessage.success('处理成功')
     dialogVisible.value = false
+    // 裁决会改变纠纷状态和排序结果，回到首页重新读取，避免使用可能过期的游标。
+    resetCursorPaging()
     await loadList()
   } catch (e) {
     if (e?.code === 409) {
       dialogVisible.value = false
+      resetCursorPaging()
       await loadList()
     }
   } finally {
@@ -79,9 +119,9 @@ onMounted(loadList)
 </script>
 
 <template>
-  <div class="admin-dispute">
+  <div class="page admin-dispute">
     <div class="head">
-      <h2 class="title">纠纷处理</h2>
+      <h2 class="page-title">纠纷处理</h2>
       <el-select
         v-model="query.status"
         placeholder="全部状态"
@@ -128,20 +168,11 @@ onMounted(loadList)
       </template>
     </el-table>
 
-    <el-pagination
-      v-if="total > query.pageSize"
-      class="pager"
-      layout="prev, pager, next"
-      :total="total"
-      :page-size="query.pageSize"
-      :current-page="query.page"
-      @current-change="
-        (p) => {
-          query.page = p
-          loadList()
-        }
-      "
-    />
+    <div v-if="cursorIndex > 0 || hasNext" class="pager">
+      <el-button :disabled="loading || cursorIndex === 0" @click="previousPage">上一页</el-button>
+      <span class="page-indicator">第 {{ cursorIndex + 1 }} 页</span>
+      <el-button :disabled="loading || !hasNext" @click="nextPage">下一页</el-button>
+    </div>
 
     <!-- 处理 dialog -->
     <el-dialog v-model="dialogVisible" title="处理纠纷" width="560px">
@@ -204,10 +235,6 @@ onMounted(loadList)
 </template>
 
 <style scoped>
-.admin-dispute {
-  padding: 16px 0;
-}
-
 .head {
   display: flex;
   justify-content: space-between;
@@ -215,9 +242,8 @@ onMounted(loadList)
   margin-bottom: 16px;
 }
 
-.title {
+.head .page-title {
   margin: 0;
-  font-size: 20px;
 }
 
 .filter {
@@ -225,8 +251,16 @@ onMounted(loadList)
 }
 
 .pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-top: 16px;
   justify-content: flex-end;
+}
+
+.page-indicator {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
 }
 
 .detail {
@@ -242,7 +276,7 @@ onMounted(loadList)
 .ev-img {
   width: 64px;
   height: 64px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .full {

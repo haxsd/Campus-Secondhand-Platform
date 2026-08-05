@@ -74,7 +74,7 @@ watch(
 </script>
 
 <template>
-  <div v-loading="loading" class="detail">
+  <div v-loading="loading" class="page detail">
     <!-- 情况一：商品不存在或已下架 -->
     <el-result
       v-if="notFound"
@@ -89,217 +89,342 @@ watch(
 
     <!-- 情况二：正常展示详情 -->
     <template v-else-if="product">
-      <el-row :gutter="24">
-        <!-- 左侧：图片轮播 -->
-        <el-col :xs="24" :md="12">
-          <el-carousel v-if="product.images?.length" height="360px" trigger="click">
-            <el-carousel-item v-for="(img, i) in product.images" :key="i">
-              <el-image :src="img" fit="cover" class="carousel-img">
-                <template #error>
-                  <div class="img-placeholder">
-                    <el-icon><Picture /></el-icon>
-                  </div>
-                </template>
-              </el-image>
-            </el-carousel-item>
-          </el-carousel>
-        </el-col>
-
-        <!-- 右侧：核心信息 + 操作按钮 -->
-        <el-col :xs="24" :md="12">
-          <h2 class="title">{{ product.title }}</h2>
-          <div class="price">¥{{ product.price }}</div>
-
-          <!-- 商品属性：用 el-descriptions 做整齐的键值对展示 -->
-          <el-descriptions :column="2" border class="attrs">
-            <el-descriptions-item label="成色">
-              {{ statusLabel(ITEM_CONDITION, product.itemCondition) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="校区">{{ product.campus }}</el-descriptions-item>
-            <el-descriptions-item label="交易地点">{{ product.tradePlace }}</el-descriptions-item>
-            <el-descriptions-item label="分类">{{ product.categoryName }}</el-descriptions-item>
-            <el-descriptions-item label="库存">{{ product.stock }}</el-descriptions-item>
-            <el-descriptions-item label="浏览量">{{ product.viewCount }}</el-descriptions-item>
-          </el-descriptions>
-
-          <!-- 操作按钮：按登录态 / 是否自己商品 / 是否有货 分别显示 -->
-          <div class="actions">
-            <el-button
-              v-if="!userStore.isLoggedIn"
-              type="primary"
-              size="large"
-              @click="onLoginToBuy"
+      <!-- 主信息卡：左图右文 -->
+      <div class="main-card">
+        <el-row :gutter="28">
+          <!-- 左侧：图片轮播 -->
+          <el-col :xs="24" :md="12">
+            <el-carousel
+              v-if="product.images?.length"
+              height="380px"
+              trigger="click"
+              class="carousel"
             >
-              登录后购买
-            </el-button>
-            <el-button v-else-if="isOwner" type="warning" size="large" @click="onManage">
-              去管理
-            </el-button>
-            <el-button
-              v-else
-              type="primary"
-              size="large"
-              :disabled="product.stock <= 0"
-              @click="onBuy"
-            >
-              {{ product.stock > 0 ? '立即购买' : '已售罄' }}
-            </el-button>
-          </div>
+              <el-carousel-item v-for="(img, i) in product.images" :key="i">
+                <el-image :src="img" fit="cover" class="carousel-img">
+                  <template #error>
+                    <div class="img-placeholder">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+              </el-carousel-item>
+            </el-carousel>
+          </el-col>
 
-          <!-- 卖家信用卡片 -->
-          <el-card class="seller" shadow="never">
-            <div class="seller-head">
-              <el-avatar :size="40">{{ product.seller.nickname?.[0] || '卖' }}</el-avatar>
-              <span class="seller-name">{{ product.seller.nickname }}</span>
+          <!-- 右侧：核心信息 + 操作按钮 -->
+          <el-col :xs="24" :md="12">
+            <h2 class="title">{{ product.title }}</h2>
+
+            <!-- 价格横幅：薄荷底色突出价格 -->
+            <div class="price-banner">
+              <span class="symbol">¥</span>
+              <span class="num">{{ product.price }}</span>
             </div>
-            <div class="seller-stats">
-              <div class="stat">
-                <span class="num">{{ product.seller.creditScore }}</span
-                >信用分
+
+            <!-- 商品属性：用 el-descriptions 做整齐的键值对展示 -->
+            <el-descriptions :column="2" border class="attrs">
+              <el-descriptions-item label="成色">
+                {{ statusLabel(ITEM_CONDITION, product.itemCondition) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="校区">{{ product.campus }}</el-descriptions-item>
+              <el-descriptions-item label="交易地点">{{ product.tradePlace }}</el-descriptions-item>
+              <el-descriptions-item label="分类">{{ product.categoryName }}</el-descriptions-item>
+              <el-descriptions-item label="库存">{{ product.stock }}</el-descriptions-item>
+              <el-descriptions-item label="浏览量">{{ product.viewCount }}</el-descriptions-item>
+            </el-descriptions>
+
+            <!-- 操作按钮：按登录态 / 是否自己商品 / 是否有货 分别显示 -->
+            <div class="actions">
+              <el-button
+                v-if="!userStore.isLoggedIn"
+                type="primary"
+                size="large"
+                class="buy-btn"
+                @click="onLoginToBuy"
+              >
+                登录后购买
+              </el-button>
+              <el-button
+                v-else-if="isOwner"
+                type="warning"
+                size="large"
+                class="buy-btn"
+                @click="onManage"
+              >
+                去管理
+              </el-button>
+              <el-button
+                v-else
+                type="primary"
+                size="large"
+                class="buy-btn"
+                :disabled="product.stock <= 0"
+                @click="onBuy"
+              >
+                {{ product.stock > 0 ? '立即购买' : '已售罄' }}
+              </el-button>
+            </div>
+
+            <!-- 卖家信用卡片 -->
+            <div class="seller">
+              <div class="seller-head">
+                <el-avatar :size="42">{{ product.seller.nickname?.[0] || '卖' }}</el-avatar>
+                <div class="seller-title">
+                  <span class="seller-name">{{ product.seller.nickname }}</span>
+                  <span class="seller-role">卖家信用档案</span>
+                </div>
               </div>
-              <div class="stat">
-                <span class="num">{{ product.seller.dealCount }}</span
-                >成交数
-              </div>
-              <div class="stat">
-                <span class="num">{{ product.seller.avgRating }}</span
-                >平均评分
-              </div>
-              <div class="stat">
-                <span class="num">{{ goodRatePercent }}%</span>好评率
+              <div class="seller-stats">
+                <div class="stat">
+                  <span class="num">{{ product.seller.creditScore }}</span>
+                  <span class="label">信用分</span>
+                </div>
+                <div class="stat">
+                  <span class="num">{{ product.seller.dealCount }}</span>
+                  <span class="label">成交数</span>
+                </div>
+                <div class="stat">
+                  <span class="num">{{ product.seller.avgRating }}</span>
+                  <span class="label">平均评分</span>
+                </div>
+                <div class="stat">
+                  <span class="num">{{ goodRatePercent }}%</span>
+                  <span class="label">好评率</span>
+                </div>
               </div>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+          </el-col>
+        </el-row>
+      </div>
 
       <!-- 商品描述 -->
-      <el-card class="section" shadow="never">
-        <template #header>商品描述</template>
+      <div class="section-card">
+        <h3 class="section-head">商品描述</h3>
         <p class="desc">{{ product.description }}</p>
-      </el-card>
+      </div>
 
       <!-- 最近评价 -->
-      <el-card class="section" shadow="never">
-        <template #header>最近评价</template>
+      <div class="section-card">
+        <h3 class="section-head">最近评价</h3>
         <div v-if="product.recentReviews?.length">
           <div v-for="(r, i) in product.recentReviews" :key="i" class="review">
-            <el-rate :model-value="r.rating" disabled size="small" />
+            <div class="review-top">
+              <el-rate :model-value="r.rating" disabled size="small" />
+              <span class="review-time">{{ r.createdAt }}</span>
+            </div>
             <p class="review-content">{{ r.content }}</p>
-            <span class="review-time">{{ r.createdAt }}</span>
           </div>
         </div>
         <el-empty v-else :image-size="60" description="暂无评价">
-          <template #image
-            ><el-icon :size="48"><Star /></el-icon
-          ></template>
+          <template #image>
+            <el-icon :size="48" color="#b9cfc6"><Star /></el-icon>
+          </template>
         </el-empty>
-      </el-card>
+      </div>
     </template>
   </div>
 </template>
 
 <style scoped>
 .detail {
-  padding: 16px 0;
   min-height: 300px;
+}
+
+/* 主信息卡 / 分区卡：统一的白色圆角面板 */
+.main-card,
+.section-card {
+  background: #fff;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  box-shadow: var(--app-shadow-sm);
+  padding: 24px;
+}
+
+.section-card {
+  margin-top: 16px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-text-1);
+}
+
+.section-head::before {
+  content: '';
+  width: 4px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--app-gradient);
+}
+
+/* 轮播：圆角 + 柔和底色 */
+.carousel {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--app-bg-soft);
 }
 
 .carousel-img,
 .img-placeholder {
   width: 100%;
-  height: 360px;
+  height: 380px;
 }
 
 .img-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f7fa;
-  color: #c0c4cc;
+  background: var(--app-bg-soft);
+  color: #b9cfc6;
   font-size: 48px;
 }
 
 .title {
-  margin: 0 0 12px;
-  font-size: 20px;
-  color: #303133;
+  margin: 4px 0 14px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--app-text-1);
 }
 
-.price {
-  color: #f56c6c;
-  font-weight: bold;
-  font-size: 30px;
+/* 价格横幅 */
+.price-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 12px 16px;
   margin-bottom: 16px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #fff7f2, #fff1e8);
+  border: 1px solid #ffe4d4;
+  color: var(--app-price);
+}
+
+.price-banner .symbol {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.price-banner .num {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .attrs {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .actions {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+}
+
+.buy-btn {
+  min-width: 172px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* 卖家信用卡片：薄荷底 */
+.seller {
+  background: var(--app-bg-soft);
+  border: 1px solid #ddf2e8;
+  border-radius: 14px;
+  padding: 16px 18px;
 }
 
 .seller-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+}
+
+.seller-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .seller-name {
   font-size: 15px;
-  font-weight: 500;
-  color: #303133;
+  font-weight: 600;
+  color: var(--app-text-1);
+}
+
+.seller-role {
+  font-size: 12px;
+  color: var(--app-text-3);
 }
 
 .seller-stats {
   display: flex;
-  gap: 24px;
 }
 
 .stat {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  font-size: 12px;
-  color: #909399;
+  align-items: center;
   gap: 4px;
+}
+
+.stat + .stat {
+  border-left: 1px solid #d9ede3;
 }
 
 .stat .num {
   font-size: 18px;
-  font-weight: bold;
-  color: #303133;
+  font-weight: 700;
+  color: var(--el-color-primary-dark-2);
 }
 
-.section {
-  margin-top: 16px;
+.stat .label {
+  font-size: 12px;
+  color: var(--app-text-3);
 }
 
 .desc {
   margin: 0;
-  line-height: 1.7;
-  color: #606266;
+  line-height: 1.8;
+  color: var(--app-text-2);
   white-space: pre-wrap;
 }
 
 .review {
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f6f3;
+}
+
+.review:first-of-type {
+  padding-top: 4px;
 }
 
 .review:last-child {
   border-bottom: none;
+  padding-bottom: 4px;
+}
+
+.review-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .review-content {
-  margin: 6px 0 4px;
-  color: #303133;
+  margin: 8px 0 0;
+  color: var(--app-text-1);
+  line-height: 1.6;
 }
 
 .review-time {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 </style>

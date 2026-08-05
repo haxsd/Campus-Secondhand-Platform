@@ -3,6 +3,7 @@
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 import { login } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 
@@ -44,13 +45,39 @@ async function onSubmit() {
 
 <template>
   <div class="auth-page">
-    <el-card class="auth-card">
-      <template #header>
-        <div class="auth-title">登录</div>
-      </template>
+    <div class="auth-card">
+      <!-- 品牌标识 -->
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 64 64" width="24" height="24" aria-hidden="true">
+            <path
+              d="M20 27h24l-2.6 16.2a4 4 0 0 1-4 3.8H26.6a4 4 0 0 1-4-3.8L20 27z"
+              fill="none"
+              stroke="#fff"
+              stroke-width="5"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M25.5 27v-3.5a6.5 6.5 0 0 1 13 0V27"
+              fill="none"
+              stroke="#fff"
+              stroke-width="5"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+      </div>
+      <h2 class="auth-title">欢迎回来</h2>
+      <p class="auth-sub">登录校园二手平台，继续你的淘好物之旅</p>
+
       <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @submit.prevent>
         <el-form-item prop="account">
-          <el-input v-model="form.account" placeholder="学号或手机号" size="large" />
+          <el-input
+            v-model="form.account"
+            placeholder="学号或手机号"
+            size="large"
+            :prefix-icon="User"
+          />
         </el-form-item>
         <el-form-item prop="password">
           <el-input
@@ -58,48 +85,96 @@ async function onSubmit() {
             type="password"
             placeholder="密码"
             size="large"
+            :prefix-icon="Lock"
             show-password
             @keyup.enter="onSubmit"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" size="large" class="submit-btn" :loading="loading" @click="onSubmit">
-            登录
+          <el-button
+            type="primary"
+            size="large"
+            class="submit-btn"
+            :loading="loading"
+            @click="onSubmit"
+          >
+            登 录
           </el-button>
         </el-form-item>
       </el-form>
+
       <div class="auth-footer">
         还没有账号？
         <el-link type="primary" @click="router.push('/register')">去注册</el-link>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 整页氛围背景：两团柔和的绿色光晕 */
 .auth-page {
-  display: flex;
-  justify-content: center;
-  padding-top: 80px;
+  min-height: calc(100vh - 64px - 132px);
+  display: grid;
+  place-items: center;
+  padding: 56px 20px 64px;
+  background:
+    radial-gradient(560px 300px at 85% 6%, rgba(52, 211, 153, 0.18), transparent 62%),
+    radial-gradient(520px 320px at 6% 92%, rgba(13, 148, 136, 0.14), transparent 62%),
+    linear-gradient(180deg, #f0faf5, var(--app-bg-page));
 }
 
 .auth-card {
-  width: 400px;
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid #eaf4ef;
+  border-radius: 20px;
+  box-shadow: var(--app-shadow-lg);
+  padding: 36px 34px 26px;
+}
+
+.brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--app-gradient);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
 }
 
 .auth-title {
-  font-size: 18px;
-  font-weight: bold;
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
   text-align: center;
+  color: var(--app-text-1);
+}
+
+.auth-sub {
+  margin: 0 0 26px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--app-text-3);
 }
 
 .submit-btn {
   width: 100%;
+  font-weight: 600;
+  letter-spacing: 2px;
 }
 
 .auth-footer {
+  margin-top: 6px;
   text-align: center;
   font-size: 14px;
-  color: #909399;
+  color: var(--app-text-3);
 }
 </style>
