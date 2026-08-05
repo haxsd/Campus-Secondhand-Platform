@@ -37,13 +37,13 @@ public class OrderTimeoutService {
      * UPDATE 决定。影响行数为 0 时不执行任何副作用，因此可以安全重复调用。</p>
      */
     @Transactional
-    public CancelResult cancelIfExpired(Long orderId) {
+    public void cancelIfExpired(Long orderId) {
         TradeOrder order = orderMapper.selectById(orderId).orElse(null);
         if (order == null) {
-            return CancelResult.ORDER_NOT_FOUND;
+            return;
         }
         if (orderMapper.timeoutCancelBySystem(orderId) == 0) {
-            return CancelResult.SKIPPED;
+            return;
         }
 
         productMapper.restoreStockForCancelledOrder(order.getProductId(), order.getQuantity());
@@ -55,7 +55,6 @@ public class OrderTimeoutService {
         log.setReason(TIMEOUT_REASON);
         orderMapper.insertLog(log);
         invalidateAfterCommit(order.getProductId());
-        return CancelResult.CANCELLED;
     }
 
     private void invalidateAfterCommit(Long productId) {
@@ -68,15 +67,4 @@ public class OrderTimeoutService {
         });
     }
 
-    /**
-     * 单次超时处理结果，供 MQ 日志和以后监控统计使用。
-     */
-    public enum CancelResult {
-        /** 本次调用成功取得关单资格，并完成库存回补。 */
-        CANCELLED,
-        /** 订单已确认、已取消、尚未到期，或已被其他线程处理。 */
-        SKIPPED,
-        /** 消息或扫描结果指向的订单已经不存在。 */
-        ORDER_NOT_FOUND
-    }
 }

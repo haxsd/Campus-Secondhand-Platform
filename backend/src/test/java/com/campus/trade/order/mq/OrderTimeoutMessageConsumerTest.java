@@ -1,9 +1,6 @@
 package com.campus.trade.order.mq;
 
 import com.campus.trade.order.service.OrderTimeoutService;
-import com.campus.trade.order.service.OrderTimeoutService.CancelResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.message.MessageView;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,23 +37,12 @@ class OrderTimeoutMessageConsumerTest {
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        // 测试环境手动注册 Java 时间模块，对齐 Spring Boot 实际创建的 ObjectMapper。
-        objectMapper.registerModule(new JavaTimeModule());
-        consumer = new OrderTimeoutMessageConsumer(objectMapper, timeoutService);
+        consumer = new OrderTimeoutMessageConsumer(timeoutService);
     }
 
     @Test
     void shouldAcknowledgeValidMessage() {
-        stubBody("""
-                {
-                  "eventId": "event-1",
-                  "orderId": 201,
-                  "confirmDeadline": "2026-07-26T12:00:00",
-                  "schemaVersion": 1
-                }
-                """);
-        when(timeoutService.cancelIfExpired(201L)).thenReturn(CancelResult.SKIPPED);
+        stubBody("201");
 
         ConsumeResult result = consumer.consume(messageView);
 
@@ -65,7 +52,7 @@ class OrderTimeoutMessageConsumerTest {
 
     @Test
     void shouldAcknowledgeMalformedMessageWithoutCallingBusinessService() {
-        stubBody("{}");
+        stubBody("不是订单ID");
 
         ConsumeResult result = consumer.consume(messageView);
 
@@ -75,16 +62,9 @@ class OrderTimeoutMessageConsumerTest {
 
     @Test
     void shouldRequestRetryWhenBusinessServiceFailsTemporarily() {
-        stubBody("""
-                {
-                  "eventId": "event-2",
-                  "orderId": 202,
-                  "confirmDeadline": "2026-07-26T12:00:00",
-                  "schemaVersion": 1
-                }
-                """);
-        when(timeoutService.cancelIfExpired(202L))
-                .thenThrow(new IllegalStateException("模拟数据库临时不可用"));
+        stubBody("202");
+        doThrow(new IllegalStateException("模拟数据库临时不可用"))
+                .when(timeoutService).cancelIfExpired(202L);
 
         ConsumeResult result = consumer.consume(messageView);
 
@@ -94,9 +74,9 @@ class OrderTimeoutMessageConsumerTest {
     /**
      * RocketMQ 的消息体是 ByteBuffer；每个测试都创建新的实例，避免读取位置被前一次消费改变。
      */
-    private void stubBody(String json) {
+    private void stubBody(String body) {
         when(messageView.getBody()).thenReturn(
-                ByteBuffer.wrap(json.getBytes(StandardCharsets.UTF_8))
+                ByteBuffer.wrap(body.getBytes(StandardCharsets.UTF_8))
         );
     }
 }

@@ -7,7 +7,6 @@ import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.entity.TradeOrderLog;
 import com.campus.trade.order.mapper.OrderMapper;
 import com.campus.trade.order.model.OrderStatus;
-import com.campus.trade.order.mq.OrderTimeoutEvent;
 import com.campus.trade.order.mq.OrderTimeoutMessagePublisher;
 import com.campus.trade.order.vo.OrderCreatedVO;
 import com.campus.trade.product.entity.Product;
@@ -24,6 +23,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,10 +32,14 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -72,6 +77,12 @@ class OrderServiceTest {
     @Mock
     private OrderTimeoutMessagePublisher timeoutMessagePublisher;
 
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -85,7 +96,8 @@ class OrderServiceTest {
                 new ObjectMapper(),
                 reviewMapper,
                 disputeMapper,
-                timeoutMessagePublisher
+                timeoutMessagePublisher,
+                redisTemplate
         );
     }
 
@@ -100,6 +112,13 @@ class OrderServiceTest {
         UserContext.set(new CurrentUser(BUYER_ID, 0, "buyer-token"));
         Product product = saleProduct();
         when(orderMapper.selectByBuyerIdAndRequestId(BUYER_ID, "request-1")).thenReturn(Optional.empty());
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(
+                eq("order:submit:" + BUYER_ID + ':' + PRODUCT_ID),
+                eq("request-1"),
+                eq(3L),
+                eq(java.util.concurrent.TimeUnit.SECONDS)
+        )).thenReturn(true);
         when(productMapper.selectById(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(productMapper.selectImageUrlsByProductId(PRODUCT_ID)).thenReturn(List.of("/api/uploads/book.jpg"));
         doAnswer(invocation -> {
@@ -123,10 +142,7 @@ class OrderServiceTest {
         verify(orderMapper).insertSnapshot(any());
         verify(productMapper).decreaseStockForOrder(PRODUCT_ID, 2);
         verify(productDetailCacheService).invalidate(PRODUCT_ID);
-        ArgumentCaptor<OrderTimeoutEvent> eventCaptor = ArgumentCaptor.forClass(OrderTimeoutEvent.class);
-        verify(timeoutMessagePublisher).publish(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().orderId()).isEqualTo(ORDER_ID);
-        assertThat(eventCaptor.getValue().confirmDeadline()).isEqualTo(inserted.getConfirmDeadline());
+        verify(timeoutMessagePublisher).publish(ORDER_ID, inserted.getConfirmDeadline());
     }
 
     @Test
@@ -144,6 +160,33 @@ class OrderServiceTest {
         assertThat(result.id()).isEqualTo(ORDER_ID);
         verify(productMapper, never()).selectById(any());
         verify(productMapper, never()).decreaseStockForOrder(any(), any());
+        verify(orderMapper, never()).insert(any());
+        // 已有订单的网络重试必须直接返回，不能再被 Redis 防连点拦截。
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void shouldRejectRapidNewOrderBeforeReadingProduct() {
+        UserContext.set(new CurrentUser(BUYER_ID, 0, "buyer-token"));
+        when(orderMapper.selectByBuyerIdAndRequestId(BUYER_ID, "request-rapid")).thenReturn(Optional.empty());
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(
+                anyString(),
+                eq("request-rapid"),
+                eq(3L),
+                eq(java.util.concurrent.TimeUnit.SECONDS)
+        )).thenReturn(false);
+        when(valueOperations.get("order:submit:" + BUYER_ID + ':' + PRODUCT_ID))
+                .thenReturn("another-request");
+
+        assertThatThrownBy(() -> orderService.create(createRequest("request-rapid", 1)))
+                .isInstanceOf(com.campus.trade.common.exception.BizException.class)
+                .hasMessage("下单操作过于频繁，请稍后再试")
+                .extracting(exception -> ((com.campus.trade.common.exception.BizException) exception).getCode())
+                .isEqualTo(429);
+
+        // 防连点命中时不应继续查询商品、写订单或扣库存。
+        verify(productMapper, never()).selectById(any());
         verify(orderMapper, never()).insert(any());
     }
 

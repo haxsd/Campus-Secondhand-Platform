@@ -55,14 +55,15 @@ class OrderTimeoutServiceTest {
         when(orderMapper.selectById(ORDER_ID)).thenReturn(Optional.of(order));
         when(orderMapper.timeoutCancelBySystem(ORDER_ID)).thenReturn(1);
 
-        OrderTimeoutService.CancelResult result = timeoutService.cancelIfExpired(ORDER_ID);
+        timeoutService.cancelIfExpired(ORDER_ID);
 
-        assertThat(result).isEqualTo(OrderTimeoutService.CancelResult.CANCELLED);
         verify(productMapper).restoreStockForCancelledOrder(PRODUCT_ID, 2);
         ArgumentCaptor<TradeOrderLog> logCaptor = ArgumentCaptor.forClass(TradeOrderLog.class);
         verify(orderMapper).insertLog(logCaptor.capture());
-        assertThat(logCaptor.getValue().getFromStatus()).isEqualTo(OrderStatus.PENDING_CONFIRM.getCode());
-        assertThat(logCaptor.getValue().getToStatus()).isEqualTo(OrderStatus.TIMEOUT_CANCELLED.getCode());
+        assertThat(logCaptor.getValue().getFromStatus())
+                .isEqualTo(OrderStatus.PENDING_CONFIRM.getCode());
+        assertThat(logCaptor.getValue().getToStatus())
+                .isEqualTo(OrderStatus.TIMEOUT_CANCELLED.getCode());
         verify(cacheService).invalidate(PRODUCT_ID);
     }
 
@@ -71,9 +72,8 @@ class OrderTimeoutServiceTest {
         when(orderMapper.selectById(ORDER_ID)).thenReturn(Optional.of(pendingOrder()));
         when(orderMapper.timeoutCancelBySystem(ORDER_ID)).thenReturn(0);
 
-        OrderTimeoutService.CancelResult result = timeoutService.cancelIfExpired(ORDER_ID);
+        timeoutService.cancelIfExpired(ORDER_ID);
 
-        assertThat(result).isEqualTo(OrderTimeoutService.CancelResult.SKIPPED);
         verify(productMapper, never()).restoreStockForCancelledOrder(any(), any());
         verify(orderMapper, never()).insertLog(any());
         verify(cacheService, never()).invalidate(any());

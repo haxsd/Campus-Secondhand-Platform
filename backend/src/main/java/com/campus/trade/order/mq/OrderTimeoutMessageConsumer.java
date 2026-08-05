@@ -1,16 +1,13 @@
 package com.campus.trade.order.mq;
 
 import com.campus.trade.order.service.OrderTimeoutService;
-import com.campus.trade.order.service.OrderTimeoutService.CancelResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.message.MessageView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 订单超时延迟消息消费者。
@@ -23,11 +20,9 @@ public class OrderTimeoutMessageConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(OrderTimeoutMessageConsumer.class);
 
-    private final ObjectMapper objectMapper;
     private final OrderTimeoutService timeoutService;
 
-    public OrderTimeoutMessageConsumer(ObjectMapper objectMapper, OrderTimeoutService timeoutService) {
-        this.objectMapper = objectMapper;
+    public OrderTimeoutMessageConsumer(OrderTimeoutService timeoutService) {
         this.timeoutService = timeoutService;
     }
 
@@ -38,27 +33,32 @@ public class OrderTimeoutMessageConsumer {
      * 记录完整定位信息后 ACK，避免一条坏消息长期占用重试资源。</p>
      */
     public ConsumeResult consume(MessageView messageView) {
+        Long orderId;
         try {
-            OrderTimeoutEvent event = readEvent(messageView.getBody());
-            event.validate();
-
-            CancelResult result = timeoutService.cancelIfExpired(event.orderId());
-            log.info(
-                    "订单超时消息消费完成: messageId={}, eventId={}, orderId={}, result={}, deliveryAttempt={}",
-                    messageView.getMessageId(),
-                    event.eventId(),
-                    event.orderId(),
-                    result,
-                    messageView.getDeliveryAttempt()
-            );
-            return ConsumeResult.SUCCESS;
-        } catch (IOException | IllegalArgumentException exception) {
-            // 永久格式错误即使重试也不会恢复，ACK 后依靠日志和定时扫描保障业务订单。
+            // 消息体只有订单 ID，直接按 UTF-8 字符串读取，不需要 DTO 和 JSON 反序列化。
+            String body = StandardCharsets.UTF_8.decode(messageView.getBody()).toString().trim();
+            orderId = Long.valueOf(body);
+            if (orderId <= 0) {
+                throw new NumberFormatException("订单 ID 必须大于 0");
+            }
+        } catch (NumberFormatException exception) {
+            // 消息内容固定后，格式错误不会因重试而恢复，确认消息并记录定位信息即可。
             log.error(
                     "订单超时消息格式不正确，停止重试: messageId={}, deliveryAttempt={}",
                     messageView.getMessageId(),
                     messageView.getDeliveryAttempt(),
                     exception
+            );
+            return ConsumeResult.SUCCESS;
+        }
+
+        try {
+            timeoutService.cancelIfExpired(orderId);
+            log.info(
+                    "订单超时消息消费完成: messageId={}, orderId={}, deliveryAttempt={}",
+                    messageView.getMessageId(),
+                    orderId,
+                    messageView.getDeliveryAttempt()
             );
             return ConsumeResult.SUCCESS;
         } catch (Exception exception) {
@@ -71,11 +71,5 @@ public class OrderTimeoutMessageConsumer {
             );
             return ConsumeResult.FAILURE;
         }
-    }
-
-    private OrderTimeoutEvent readEvent(ByteBuffer body) throws IOException {
-        byte[] bytes = new byte[body.remaining()];
-        body.get(bytes);
-        return objectMapper.readValue(bytes, OrderTimeoutEvent.class);
     }
 }

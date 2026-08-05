@@ -25,37 +25,26 @@ import java.util.Map;
 public class OrderTimeoutMessagingConfiguration {
 
     /**
-     * RocketMQ 5 客户端统一入口，用于创建消息、生产者和消费者。
+     * RocketMQ 5 客户端统一入口，只是本地工厂对象，不会在这里建立网络连接。
      */
     @Bean
-    @ConditionalOnProperty(
-            prefix = "campus.order.timeout-message",
-            name = "enabled",
-            havingValue = "true"
-    )
     public ClientServiceProvider orderTimeoutClientServiceProvider() {
+
         return ClientServiceProvider.loadService();
     }
 
     /**
-     * 客户端连接 RocketMQ Proxy 的公共配置。
+     * 客户端连接 RocketMQ Proxy 的公共配置，创建该对象本身也不会连接网络。
      */
     @Bean
-    @ConditionalOnProperty(
-            prefix = "campus.order.timeout-message",
-            name = "enabled",
-            havingValue = "true"
-    )
     public ClientConfiguration orderTimeoutClientConfiguration(OrderTimeoutMessageProperties properties) {
         return ClientConfiguration.newBuilder()
                 .setEndpoints(properties.endpoints())
-                .setRequestTimeout(properties.requestTimeout())
-                .enableSsl(properties.sslEnabled())
                 .build();
     }
 
     /**
-     * 单例生产者。客户端内部会按 producerMaxAttempts 对临时发送失败进行有限重试。
+     * 单例生产者。没有特殊需求时直接使用 RocketMQ 客户端默认重试配置。
      */
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(
@@ -71,7 +60,6 @@ public class OrderTimeoutMessagingConfiguration {
         return provider.newProducerBuilder()
                 .setClientConfiguration(clientConfiguration)
                 .setTopics(properties.topic())
-                .setMaxAttempts(properties.producerMaxAttempts())
                 .build();
     }
 

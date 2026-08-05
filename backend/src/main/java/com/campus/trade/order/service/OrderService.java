@@ -10,7 +10,6 @@ import com.campus.trade.order.entity.ProductSnapshot;
 import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.entity.TradeOrderLog;
 import com.campus.trade.order.mapper.OrderMapper;
-import com.campus.trade.order.mq.OrderTimeoutEvent;
 import com.campus.trade.order.mq.OrderTimeoutMessagePublisher;
 import com.campus.trade.order.model.OrderStatus;
 import com.campus.trade.order.vo.OrderCreatedVO;
@@ -31,6 +30,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -42,6 +43,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 订单业务服务。
@@ -55,8 +57,13 @@ public class OrderService {
     /** 订单号以创建时间开头，后缀使用 UUID 片段降低多线程、多实例碰撞概率。 */
     private static final DateTimeFormatter ORDER_NO_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
-    /** 订单确认期限：卖家需在 24 小时内确认；自动超时取消由后续定时任务阶段实现。 */
+    /** 订单确认期限：卖家需在 24 小时内确认；定时扫描负责默认关单，RocketMQ 可选加速触发。 */
     private static final long CONFIRM_TIMEOUT_HOURS = 24L;
+
+    /** Redis 连点防护的 Key 前缀；严格幂等仍由 requestId 和数据库唯一索引保证。 */
+    private static final String SUBMIT_DEBOUNCE_KEY_PREFIX = "order:submit:";
+    /** 同一用户对同一商品的连续新下单请求，3 秒内只允许一个进入主业务链路。 */
+    private static final long SUBMIT_DEBOUNCE_SECONDS = 3L;
 
     /** 订单状态日志的操作方编码，与 trade_order_log.operator_type 表注释一致。 */
     private static final int OPERATOR_BUYER = 0;
@@ -70,6 +77,7 @@ public class OrderService {
     private final ReviewMapper reviewMapper;
     private final DisputeMapper disputeMapper;
     private final OrderTimeoutMessagePublisher timeoutMessagePublisher;
+    private final StringRedisTemplate redisTemplate;
 
     public OrderService(
             OrderMapper orderMapper,
@@ -79,7 +87,8 @@ public class OrderService {
             ObjectMapper objectMapper,
             ReviewMapper reviewMapper,
             DisputeMapper disputeMapper,
-            OrderTimeoutMessagePublisher timeoutMessagePublisher
+            OrderTimeoutMessagePublisher timeoutMessagePublisher,
+            StringRedisTemplate redisTemplate
     ) {
         this.orderMapper = orderMapper;
         this.productMapper = productMapper;
@@ -89,6 +98,7 @@ public class OrderService {
         this.reviewMapper = reviewMapper;
         this.disputeMapper = disputeMapper;
         this.timeoutMessagePublisher = timeoutMessagePublisher;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -101,11 +111,21 @@ public class OrderService {
     @Transactional
     public OrderCreatedVO create(CreateOrderRequest request) {
         Long buyerId = UserContext.requireCurrentUser().userId();
+        // DTO 已校验非空；trim 后作为数据库幂等键，避免首尾空格导致同一次请求被当成不同请求。
+        String requestId = request.requestId().trim();
 
         // 普通重试直接返回首次创建结果，不再读取商品或重复扣库存。
-        TradeOrder existed = orderMapper.selectByBuyerIdAndRequestId(buyerId, request.requestId()).orElse(null);
+        TradeOrder existed = orderMapper.selectByBuyerIdAndRequestId(buyerId, requestId).orElse(null);
         if (existed != null) {
             return toCreatedVO(existed);
+        }
+
+        /*
+         * 防连点必须放在幂等查询之后：同一个 requestId 的网络重试应直接得到原订单，
+         * 而不是被 429 拦住。这里仅限制“尚未有订单记录的连续新请求”，不能代替数据库约束。
+         */
+        if (!tryAcquireSubmitDebounce(buyerId, request.productId(), requestId)) {
+            throw new BizException(ErrorCode.TOO_MANY_REQUESTS, "下单操作过于频繁，请稍后再试");
         }
 
         Product product = productMapper.selectById(request.productId())
@@ -116,7 +136,7 @@ public class OrderService {
 
         TradeOrder order = new TradeOrder();
         order.setOrderNo(generateOrderNo());
-        order.setRequestId(request.requestId().trim());
+        order.setRequestId(requestId);
         order.setBuyerId(buyerId);
         order.setSellerId(product.getSellerId());
         order.setProductId(product.getId());
@@ -135,7 +155,7 @@ public class OrderService {
         } catch (DuplicateKeyException exception) {
             // 两个同 requestId 的请求同时越过首次查询时，唯一索引仍会拦住第二个请求。
             // 此时第二个请求尚未扣库存，直接读取并返回第一个请求已创建的订单即可。
-            return orderMapper.selectByBuyerIdAndRequestId(buyerId, request.requestId())
+            return orderMapper.selectByBuyerIdAndRequestId(buyerId, requestId)
                     .map(this::toCreatedVO)
                     .orElseThrow(() -> exception);
         }
@@ -362,6 +382,40 @@ public class OrderService {
                 + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
     }
 
+    /**
+     * 尝试取得短窗口下单资格。
+     *
+     * <p>Key 按买家和商品划分，避免用户误连点对同一商品连续创建多笔不同 requestId 的订单。
+     * Key 只依赖 TTL 自动过期，业务成功或失败时都不主动删除，避免旧请求删掉新请求持有的 Key。</p>
+     *
+     * <p>Redis 只是体验层优化。Redis 连接异常时放行请求，由后续的 requestId 唯一约束和库存条件更新
+     * 继续守住正确性；不能因为防连点组件故障而让正常下单主链路整体不可用。</p>
+     */
+    private boolean tryAcquireSubmitDebounce(Long buyerId, Long productId, String requestId) {
+        String key = SUBMIT_DEBOUNCE_KEY_PREFIX + buyerId + ':' + productId;
+        try {
+            Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+                    key,
+                    requestId,
+                    SUBMIT_DEBOUNCE_SECONDS,
+                    TimeUnit.SECONDS
+            );
+            if (Boolean.TRUE.equals(acquired)) {
+                return true;
+            }
+
+            /*
+             * A matching requestId is a concurrent retry of the same business request. It must still
+             * reach the database unique index so the caller receives the original order; a different
+             * requestId is an actual repeated click and is rejected during the short debounce window.
+             */
+            return requestId.equals(redisTemplate.opsForValue().get(key));
+        } catch (DataAccessException exception) {
+            // 数据库层仍有幂等和防超卖保护，Redis 故障只降级掉体验优化。
+            return true;
+        }
+    }
+
     private String writeImages(List<String> images) {
         try {
             return objectMapper.writeValueAsString(images);
@@ -413,15 +467,14 @@ public class OrderService {
      * 现有定时扫描会根据 confirm_deadline 补偿关单。</p>
      */
     private void publishTimeoutMessageAfterCommit(TradeOrder order) {
-        OrderTimeoutEvent event = OrderTimeoutEvent.create(order.getId(), order.getConfirmDeadline());
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            timeoutMessagePublisher.publish(event);
+            timeoutMessagePublisher.publish(order.getId(), order.getConfirmDeadline());
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                timeoutMessagePublisher.publish(event);
+                timeoutMessagePublisher.publish(order.getId(), order.getConfirmDeadline());
             }
         });
     }

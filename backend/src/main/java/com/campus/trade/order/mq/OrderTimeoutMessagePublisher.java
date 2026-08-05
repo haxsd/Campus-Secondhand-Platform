@@ -1,6 +1,5 @@
 package com.campus.trade.order.mq;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
 import org.apache.rocketmq.client.apis.message.Message;
 import org.apache.rocketmq.client.apis.producer.Producer;
@@ -9,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
@@ -24,20 +25,17 @@ public class OrderTimeoutMessagePublisher {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final ObjectProvider<Producer> producerProvider;
-    private final ObjectProvider<ClientServiceProvider> clientServiceProvider;
+    private final ClientServiceProvider clientServiceProvider;
     private final OrderTimeoutMessageProperties properties;
-    private final ObjectMapper objectMapper;
 
     public OrderTimeoutMessagePublisher(
             ObjectProvider<Producer> producerProvider,
-            ObjectProvider<ClientServiceProvider> clientServiceProvider,
-            OrderTimeoutMessageProperties properties,
-            ObjectMapper objectMapper
+            ClientServiceProvider clientServiceProvider,
+            OrderTimeoutMessageProperties properties
     ) {
         this.producerProvider = producerProvider;
         this.clientServiceProvider = clientServiceProvider;
         this.properties = properties;
-        this.objectMapper = objectMapper;
     }
 
     /**
@@ -46,45 +44,42 @@ public class OrderTimeoutMessagePublisher {
      * <p>发送失败只记录错误，不向已经提交成功的下单接口抛异常；
      * 数据库中的 confirm_deadline 和定时扫描会继续保证最终关单。</p>
     */
-    public void publish(OrderTimeoutEvent event) {
+    public void publish(Long orderId, LocalDateTime confirmDeadline) {
         try {
             Producer producer = producerProvider.getIfAvailable();
-            ClientServiceProvider provider = clientServiceProvider.getIfAvailable();
-            if (producer == null || provider == null) {
+            if (producer == null) {
                 // MQ 未启用时不打印错误；这是本地开发和降级运行的正常状态。
                 return;
             }
 
-            event.validate();
-            long deliveryTimestamp = event.confirmDeadline()
+            long deliveryTimestamp = confirmDeadline
                     .atZone(BUSINESS_ZONE)
                     .toInstant()
                     .toEpochMilli();
-            Message message = provider.newMessageBuilder()
+            Message message = clientServiceProvider.newMessageBuilder()
                     .setTopic(properties.topic())
                     .setTag(properties.tag())
-                    .setKeys(event.eventId(), "order-" + event.orderId())
+                    .setKeys("order-" + orderId)
                     .setDeliveryTimestamp(deliveryTimestamp)
-                    .setBody(objectMapper.writeValueAsBytes(event))
+                    // 消费端只需要订单 ID，不为一个 Long 额外创建 DTO 和 JSON 结构。
+                    .setBody(String.valueOf(orderId).getBytes(StandardCharsets.UTF_8))
                     .build();
 
             // 异步发送让下单响应不等待 MQ 网络结果；最终失败仍由 confirm_deadline 扫描补偿。
             producer.sendAsync(message).whenComplete((receipt, throwable) -> {
                 if (throwable != null) {
                     log.error(
-                            "订单超时延迟消息发送失败，将由定时任务兜底: eventId={}, orderId={}",
-                            event.eventId(),
-                            event.orderId(),
+                            "订单超时延迟消息发送失败，将由定时任务兜底: orderId={}",
+                            orderId,
                             throwable
                     );
                     return;
                 }
                 log.info(
-                        "订单超时延迟消息发送成功: eventId={}, orderId={}, messageId={}, deliveryTime={}",
-                        event.eventId(),
-                        event.orderId(),
+                        "订单超时延迟消息发送成功: orderId={}, messageId={}, deliveryTime={}",
+                        orderId,
                         receipt.getMessageId(),
-                        event.confirmDeadline()
+                        confirmDeadline
                 );
             });
         } catch (Exception exception) {
@@ -93,9 +88,8 @@ public class OrderTimeoutMessagePublisher {
              * 此时不能让 MQ 故障把“实际已创建成功”的订单伪装成接口失败。
              */
             log.error(
-                    "订单超时延迟消息发送失败，将由定时任务兜底: eventId={}, orderId={}",
-                    event == null ? null : event.eventId(),
-                    event == null ? null : event.orderId(),
+                    "订单超时延迟消息发送失败，将由定时任务兜底: orderId={}",
+                    orderId,
                     exception
             );
         }
