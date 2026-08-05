@@ -10,7 +10,7 @@ try {
         Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
     }
-    docker compose --env-file $EnvFile -f rocketmq/docker-compose.yml down
+    docker compose --env-file $EnvFile -f deploy/rocketmq/docker-compose.yml down
     docker compose --env-file $EnvFile --profile production -f deploy/docker-compose.yml down
 }
 finally {

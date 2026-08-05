@@ -1,3 +1,5 @@
+name: campus-trade
+
 services:
   namesrv:
     image: apache/rocketmq:5.3.2
@@ -84,10 +86,6 @@ services:
 
 volumes:
   campus-trade-namesrv-logs:
-    name: deploy_campus-trade-namesrv-logs
   campus-trade-broker-store:
-    name: deploy_campus-trade-broker-store
   campus-trade-broker-logs:
-    name: deploy_campus-trade-broker-logs
   campus-trade-proxy-logs:
-    name: deploy_campus-trade-proxy-logs
