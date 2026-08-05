@@ -28,3 +28,17 @@ logs/
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# --- Project-specific build and runtime files ---
+backend/uploads/
+frontend/.env.local
+frontend/.env.*.local
+
+# --- Bridge and local tooling ---
+.devin-bridge/
+.vwdevin*
+
+# --- Personal materials and conversation records ---
+docs/简历项目文档.md
+docs/实习简历.pdf
+对话记录/
