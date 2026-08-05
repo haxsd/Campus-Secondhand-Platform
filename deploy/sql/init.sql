@@ -226,7 +226,8 @@ CREATE TABLE `dispute` (
   `updated_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_order` (`order_id`),
-  KEY `idx_status` (`status`, `created_at`, `id`)
+  KEY `idx_status` (`status`, `created_at`, `id`),
+  KEY `idx_dispute_created_id` (`created_at`, `id`)
 ) ENGINE=InnoDB COMMENT='纠纷表';
 
 -- ---------------------------------------------------------------------
