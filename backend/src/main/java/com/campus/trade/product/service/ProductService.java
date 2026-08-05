@@ -260,18 +260,11 @@ public class ProductService {
      * 查询公开商品详情，并组合分类、卖家信用、图片和最近评价。
      */
     public ProductDetailVO getPublicDetail(Long productId) {
-        ProductDetailCacheService.Lookup lookup = productDetailCacheService.lookup(productId);
-        ProductDetailVO detail;
-        if (lookup.hit()) {
-            detail = lookup.detail();
-        } else {
-            detail = loadPublicDetail(productId);
-            if (detail == null) {
-                productDetailCacheService.putNull(productId);
-            } else {
-                productDetailCacheService.putDetail(detail);
-            }
-        }
+        // 缓存命中不加锁；仅未命中时按商品 ID 互斥回源，避免热点 key 失效后击穿 MySQL。
+        ProductDetailVO detail = productDetailCacheService.getOrLoad(
+                productId,
+                () -> loadPublicDetail(productId)
+        );
 
         if (detail == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "商品不存在或已下架");
