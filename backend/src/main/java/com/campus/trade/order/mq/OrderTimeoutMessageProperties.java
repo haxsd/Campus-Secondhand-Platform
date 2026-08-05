@@ -12,6 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "campus.order.timeout-message")
 public record OrderTimeoutMessageProperties(
         @DefaultValue("localhost:8081") String endpoints,
+        @DefaultValue("false") boolean sslEnabled,
         @DefaultValue("campus_trade_order_timeout") String topic,
         @DefaultValue("CONFIRM_TIMEOUT") String tag,
         @DefaultValue("campus_trade_order_timeout_consumer") String consumerGroup

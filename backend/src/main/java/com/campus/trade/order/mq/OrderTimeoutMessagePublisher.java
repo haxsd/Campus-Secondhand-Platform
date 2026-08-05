@@ -56,6 +56,12 @@ public class OrderTimeoutMessagePublisher {
                     .atZone(BUSINESS_ZONE)
                     .toInstant()
                     .toEpochMilli();
+            log.debug(
+                    "RocketMQ timeout timestamps: orderId={}, deliveryTimestamp={}, currentTimestamp={}",
+                    orderId,
+                    deliveryTimestamp,
+                    System.currentTimeMillis()
+            );
             Message message = clientServiceProvider.newMessageBuilder()
                     .setTopic(properties.topic())
                     .setTag(properties.tag())

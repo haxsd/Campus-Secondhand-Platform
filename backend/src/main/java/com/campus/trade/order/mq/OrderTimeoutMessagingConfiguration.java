@@ -40,6 +40,7 @@ public class OrderTimeoutMessagingConfiguration {
     public ClientConfiguration orderTimeoutClientConfiguration(OrderTimeoutMessageProperties properties) {
         return ClientConfiguration.newBuilder()
                 .setEndpoints(properties.endpoints())
+                .enableSsl(properties.sslEnabled())
                 .build();
     }
 

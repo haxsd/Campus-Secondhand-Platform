@@ -40,6 +40,7 @@ campus:
       enabled: ${CT_ORDER_TIMEOUT_MESSAGE_ENABLED:false}
       # RocketMQ 5 gRPC 客户端连接 Proxy，不是连接 NameServer 的 9876 端口。
       endpoints: ${CT_ROCKETMQ_ENDPOINTS:localhost:8081}
+      ssl-enabled: ${CT_ROCKETMQ_SSL_ENABLED:false}
       topic: ${CT_ROCKETMQ_ORDER_TIMEOUT_TOPIC:campus_trade_order_timeout}
       tag: ${CT_ROCKETMQ_ORDER_TIMEOUT_TAG:CONFIRM_TIMEOUT}
       consumer-group: ${CT_ROCKETMQ_ORDER_TIMEOUT_CONSUMER_GROUP:campus_trade_order_timeout_consumer}
