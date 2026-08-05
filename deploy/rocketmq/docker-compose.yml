@@ -1,4 +1,4 @@
-name: campus-trade
+name: campus-trade-mq
 
 services:
   namesrv:

@@ -85,18 +85,22 @@ Vue 3 前端，为学生提供商品发布、审核、下单、线下见面交�
 ## Compose 编排
 
 Compose 文件用 YAML 描述多个容器、网络、卷和健康依赖，可以通过一条命令
-创建并启动一组服务。本项目两个 Compose 文件都固定使用项目名：
+创建并启动一组服务。本项目将应用基础设施和 RocketMQ 分为两个独立的
+Compose 项目：
 
 ```text
-campus-trade
+campus-trade       MySQL、Redis、nginx
+campus-trade-mq    RocketMQ
 ```
 
 其中：
 
 - `deploy/docker-compose.yml` 管理 MySQL、Redis 和 nginx；
-- `deploy/rocketmq/docker-compose.yml` 管理 NameServer、Broker、Proxy、
+- `deploy/rocketmq/docker-compose.yml` 使用项目名 `campus-trade-mq`，管理
+  NameServer、Broker、Proxy、
   `rocketmq-permissions` 和 `topic-init`；
 - RocketMQ 会自动初始化 `campus_trade_order_timeout` 延迟 Topic；
+- 两个 Compose 项目彼此独立，不会互相识别对方的容器为 orphan；
 - 不要使用 `--remove-orphans`，避免误处理其他 Compose 项目的容器。
 
 ## 快速开始
