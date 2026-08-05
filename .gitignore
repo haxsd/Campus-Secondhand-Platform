@@ -37,6 +37,7 @@ frontend/.env.*.local
 # --- Bridge and local tooling ---
 .devin-bridge/
 .vwdevin*
+tmp/
 
 # --- Personal materials and conversation records ---
 docs/简历项目文档.md
