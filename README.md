@@ -5,7 +5,12 @@ PowerShell. nginx runs in Docker by default, so the host does not need a local
 nginx installation. The JVM and MySQL must both run in `Asia/Shanghai`;
 otherwise `CURRENT_TIMESTAMP` and order confirmation deadlines can drift.
 
-From the project root:
+从工程根目录开始的完整本机操作步骤见
+[`deploy/本机部署手册.md`](deploy/本机部署手册.md)。该手册覆盖 Docker
+前置检查、已有 MySQL/Redis 容器复用、RocketMQ 独立编排、后端打包、
+nginx 启动和黄金路径演示。
+
+快速路径：
 
 ```powershell
 Copy-Item deploy/.env.example deploy/.env
@@ -14,21 +19,22 @@ Copy-Item deploy/.env.example deploy/.env
 .\deploy\start.ps1
 ```
 
-The scripts start MySQL, Redis, RocketMQ NameServer/Broker/Proxy, the backend
-with the `prod` profile, and an nginx container serving `frontend/dist`.
-RocketMQ topic initialization and volume permissions are handled automatically.
-Open `http://localhost/`; `/api` is proxied to the host backend and `/uploads`
-is proxied to the backend upload endpoint. Stop everything with:
+`deploy/docker-compose.yml` 负责 MySQL、Redis 和 nginx；独立的
+`rocketmq/docker-compose.yml` 负责 NameServer、Broker、Proxy 以及两个
+初始化服务。RocketMQ topic 初始化和 volume 权限处理会自动完成。
+如果本机已经有 `ct-mysql`、`ct-redis` 占用 3306/6379，请按操作手册跳过
+Compose 中的 MySQL/Redis，仅复用并检查已有容器。
+
+打开 `http://localhost/`；`/api` 和 `/uploads` 会由 nginx 反代到后端。
+停止本项目服务：
 
 ```powershell
 .\deploy\stop.ps1
 ```
 
-RocketMQ 5 uses Proxy endpoint `127.0.0.1:8081` and NameServer port `9876`.
-The timeout topic is `campus_trade_order_timeout`; the compose topic-init
-service creates it as a DELAY topic without a manual `mqadmin` command. The
-host nginx configuration remains available at
-`deploy/nginx/campus-trade.conf` for an alternative native-nginx setup.
+RocketMQ 5 使用 Proxy 地址 `127.0.0.1:8081` 和 NameServer 端口 `9876`。
+超时 topic 为 `campus_trade_order_timeout`，独立编排中的 topic-init 会将其
+自动创建为 DELAY topic，不需要手工执行 `mqadmin`。
 
 Demo accounts are seeded by `deploy/sql/initial-data.sql`:
 
