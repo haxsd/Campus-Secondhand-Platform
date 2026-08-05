@@ -1,0 +1,46 @@
+spring:
+  # JVM and MySQL must both run in Asia/Shanghai; otherwise order timeout checks drift.
+  datasource:
+    url: jdbc:mysql://${CT_DB_HOST:127.0.0.1}:${CT_DB_PORT:3306}/${CT_DB_NAME:campus_trade}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${CT_DB_USERNAME:root}
+    password: ${CT_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: CampusTradeHikariPool
+      minimum-idle: ${CT_DB_MINIMUM_IDLE:2}
+      maximum-pool-size: ${CT_DB_MAXIMUM_POOL_SIZE:10}
+      connection-timeout: ${CT_DB_CONNECTION_TIMEOUT:3000}
+      validation-timeout: ${CT_DB_VALIDATION_TIMEOUT:1000}
+  data:
+    redis:
+      host: ${CT_REDIS_HOST:127.0.0.1}
+      port: ${CT_REDIS_PORT:6379}
+      database: ${CT_REDIS_DATABASE:0}
+      password: ${CT_REDIS_PASSWORD:}
+      connect-timeout: ${CT_REDIS_CONNECT_TIMEOUT:3s}
+
+server:
+  port: ${CT_SERVER_PORT:8080}
+
+campus:
+  file:
+    upload-dir: "${CT_UPLOAD_DIR:C:/campus-trade/uploads}"
+  jwt:
+    issuer: ${CT_JWT_ISSUER:campus-trade}
+    secret: ${CT_JWT_SECRET}
+    ttl: ${CT_JWT_TTL:7d}
+  order:
+    timeout-scan-enabled: ${CT_ORDER_TIMEOUT_SCAN_ENABLED:true}
+    timeout-scan-delay-ms: ${CT_ORDER_TIMEOUT_SCAN_DELAY_MS:60000}
+    timeout-message:
+      enabled: ${CT_ORDER_TIMEOUT_MESSAGE_ENABLED:true}
+      endpoints: ${CT_ROCKETMQ_ENDPOINTS:127.0.0.1:8081}
+      ssl-enabled: ${CT_ROCKETMQ_SSL_ENABLED:false}
+      topic: ${CT_ROCKETMQ_ORDER_TIMEOUT_TOPIC:campus_trade_order_timeout}
+      tag: ${CT_ROCKETMQ_ORDER_TIMEOUT_TAG:CONFIRM_TIMEOUT}
+      consumer-group: ${CT_ROCKETMQ_ORDER_TIMEOUT_CONSUMER_GROUP:campus_trade_order_timeout_consumer}
+
+logging:
+  level:
+    root: info
+    com.campus.trade: info

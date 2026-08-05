@@ -1,0 +1,86 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: campus-trade-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-campus_trade}
+    command: --default-time-zone=+08:00
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - campus-trade-mysql-data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./sql/initial-data.sql:/docker-entrypoint-initdb.d/02-initial-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7
+    container_name: campus-trade-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - campus-trade-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-namesrv
+    profiles: ["rocketmq"]
+    restart: unless-stopped
+    command: ["sh", "mqnamesrv"]
+    ports:
+      - "${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    volumes:
+      - campus-trade-namesrv-logs:/home/rocketmq/logs
+
+  broker:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-broker
+    profiles: ["rocketmq"]
+    restart: unless-stopped
+    depends_on:
+      namesrv:
+        condition: service_started
+    command: ["sh", "-c", "sh mqbroker -c /home/rocketmq/rocketmq-5.3.2/conf/broker.conf; tail -f /dev/null"]
+    ports:
+      - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${ROCKETMQ_BROKER_HA_PORT:-10912}:10912"
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf:ro
+      - campus-trade-broker-store:/home/rocketmq/store
+      - campus-trade-broker-logs:/home/rocketmq/logs
+
+  proxy:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-proxy
+    profiles: ["rocketmq"]
+    restart: unless-stopped
+    depends_on:
+      namesrv:
+        condition: service_started
+      broker:
+        condition: service_started
+    command: ["sh", "-c", "sh mqproxy -n namesrv:9876; tail -f /dev/null"]
+    ports:
+      - "${ROCKETMQ_PROXY_PORT:-8081}:8081"
+    volumes:
+      - campus-trade-proxy-logs:/home/rocketmq/logs
+
+volumes:
+  campus-trade-mysql-data:
+  campus-trade-redis-data:
+  campus-trade-namesrv-logs:
+  campus-trade-broker-store:
+  campus-trade-broker-logs:
+  campus-trade-proxy-logs:

@@ -8,7 +8,7 @@ import router from '@/router'
 
 // 创建独立的 axios 实例（不污染全局默认配置）
 const instance = axios.create({
-  baseURL: '/api', // 所有请求自动加 /api 前缀，如 post('/auth/login') 实际请求 /api/auth/login
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 10000, // 10 秒超时，防止请求卡死页面一直转圈
 })
 
