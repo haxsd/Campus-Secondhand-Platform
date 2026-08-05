@@ -1,8 +1,10 @@
 ### Deployment notes
 
-The production deployment requires JDK 17, Node.js, Docker Desktop, and Windows
+The production deployment requires Java 17 or newer, Node.js, Docker Desktop, and Windows
 PowerShell. nginx runs in Docker by default, so the host does not need a local
-nginx installation. The JVM and MySQL must both run in `Asia/Shanghai`;
+nginx installation. JDK 25 has been verified to build, test, and run this
+Spring Boot 3.5.16 project whose compiler target is `release 17`. The JVM and
+MySQL must both run in `Asia/Shanghai`;
 otherwise `CURRENT_TIMESTAMP` and order confirmation deadlines can drift.
 
 从工程根目录开始的完整本机操作步骤见

@@ -11,6 +11,18 @@ function Import-DotEnv([string]$Path) {
     }
 }
 
+function Get-JavaMajorVersion([string]$JavaPath) {
+    $versionOutput = (& $JavaPath -version 2>&1 | Out-String)
+    if ($versionOutput -match 'version "([^"]+)"') {
+        $version = $matches[1]
+        if ($version -like '1.*') {
+            return [int]($version.Split('.')[1])
+        }
+        return [int]($version.Split('.')[0])
+    }
+    return $null
+}
+
 Import-DotEnv $EnvFile
 $env:CT_PROFILE = if ($env:CT_PROFILE) { $env:CT_PROFILE } else { 'prod' }
 $uploadDir = if ($env:CT_UPLOAD_DIR) { $env:CT_UPLOAD_DIR } else { 'C:\campus-trade\uploads' }
@@ -39,12 +51,33 @@ try {
 
     $backendStdout = Join-Path $env:TEMP 'campus-trade-backend.out.log'
     $backendStderr = Join-Path $env:TEMP 'campus-trade-backend.err.log'
-    $javaCommand = Get-Command java -ErrorAction SilentlyContinue
-    if (-not $javaCommand -and $env:JAVA_HOME) {
-        $javaCommand = Get-Command (Join-Path $env:JAVA_HOME 'bin\java.exe') -ErrorAction SilentlyContinue
+    $javaPath = $null
+    $javaMajorVersion = $null
+    $pathJava = Get-Command java -ErrorAction SilentlyContinue
+    if ($pathJava) {
+        $pathJavaMajorVersion = Get-JavaMajorVersion $pathJava.Source
+        if ($pathJavaMajorVersion -ge 17) {
+            $javaPath = $pathJava.Source
+            $javaMajorVersion = $pathJavaMajorVersion
+        }
     }
-    if (-not $javaCommand) { throw 'Java 17 was not found. Set JAVA_HOME or add java.exe to PATH.' }
-    $backend = Start-Process $javaCommand.Source -ArgumentList "-Duser.timezone=Asia/Shanghai", "-jar", "`"$($jar.FullName)`"" `
+
+    if (-not $javaPath -and $env:JAVA_HOME) {
+        $javaHomeJava = Join-Path $env:JAVA_HOME 'bin\java.exe'
+        if (Test-Path $javaHomeJava) {
+            $javaHomeMajorVersion = Get-JavaMajorVersion $javaHomeJava
+            if ($javaHomeMajorVersion -ge 17) {
+                $javaPath = $javaHomeJava
+                $javaMajorVersion = $javaHomeMajorVersion
+            }
+        }
+    }
+
+    if (-not $javaPath) {
+        throw 'Java 17 or newer was not found. Add a Java 17+ bin directory to PATH or set JAVA_HOME to a Java 17+ installation.'
+    }
+
+    $backend = Start-Process $javaPath -ArgumentList "-Duser.timezone=Asia/Shanghai", "-jar", "`"$($jar.FullName)`"" `
         -WorkingDirectory $ProjectRoot -RedirectStandardOutput $backendStdout `
         -RedirectStandardError $backendStderr -PassThru
     $backend.Id | Set-Content (Join-Path $env:TEMP 'campus-trade-backend.pid')
