@@ -43,10 +43,6 @@ campus:
       topic: ${CT_ROCKETMQ_ORDER_TIMEOUT_TOPIC:campus_trade_order_timeout}
       tag: ${CT_ROCKETMQ_ORDER_TIMEOUT_TAG:CONFIRM_TIMEOUT}
       consumer-group: ${CT_ROCKETMQ_ORDER_TIMEOUT_CONSUMER_GROUP:campus_trade_order_timeout_consumer}
-      # 本地 Docker Proxy 默认不启用 TLS；云服务环境按实际配置开启。
-      ssl-enabled: ${CT_ROCKETMQ_SSL_ENABLED:false}
-      request-timeout: ${CT_ROCKETMQ_REQUEST_TIMEOUT:3s}
-      producer-max-attempts: ${CT_ROCKETMQ_PRODUCER_MAX_ATTEMPTS:3}
 
 logging:
   level:
