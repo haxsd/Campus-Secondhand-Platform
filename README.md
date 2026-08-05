@@ -1,7 +1,8 @@
 ### Deployment notes
 
-The production deployment requires JDK 17, Node.js, Docker Desktop, Windows
-PowerShell, and nginx. The JVM and MySQL must both run in `Asia/Shanghai`;
+The production deployment requires JDK 17, Node.js, Docker Desktop, and Windows
+PowerShell. nginx runs in Docker by default, so the host does not need a local
+nginx installation. The JVM and MySQL must both run in `Asia/Shanghai`;
 otherwise `CURRENT_TIMESTAMP` and order confirmation deadlines can drift.
 
 From the project root:
@@ -14,16 +15,20 @@ Copy-Item deploy/.env.example deploy/.env
 ```
 
 The scripts start MySQL, Redis, RocketMQ NameServer/Broker/Proxy, the backend
-with the `prod` profile, and nginx serving `frontend/dist`. Open
-`http://localhost/`; `/api` is proxied to `127.0.0.1:8080` and `/uploads` is
-proxied to the backend upload endpoint. Stop everything with:
+with the `prod` profile, and an nginx container serving `frontend/dist`.
+RocketMQ topic initialization and volume permissions are handled automatically.
+Open `http://localhost/`; `/api` is proxied to the host backend and `/uploads`
+is proxied to the backend upload endpoint. Stop everything with:
 
 ```powershell
 .\deploy\stop.ps1
 ```
 
 RocketMQ 5 uses Proxy endpoint `127.0.0.1:8081` and NameServer port `9876`.
-The timeout topic is `campus_trade_order_timeout`.
+The timeout topic is `campus_trade_order_timeout`; the compose topic-init
+service creates it as a DELAY topic without a manual `mqadmin` command. The
+host nginx configuration remains available at
+`deploy/nginx/campus-trade.conf` for an alternative native-nginx setup.
 
 Demo accounts are seeded by `deploy/sql/initial-data.sql`:
 

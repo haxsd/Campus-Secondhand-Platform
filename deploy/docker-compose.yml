@@ -44,14 +44,36 @@ services:
     volumes:
       - campus-trade-namesrv-logs:/home/rocketmq/logs
 
+  rocketmq-permissions:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-rocketmq-permissions
+    profiles: ["rocketmq"]
+    user: "0:0"
+    depends_on:
+      namesrv:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /home/rocketmq/store /home/rocketmq/broker-logs
+        /home/rocketmq/proxy-logs /home/rocketmq/namesrv-logs &&
+        chown -R 3000:3000 /home/rocketmq/store /home/rocketmq/broker-logs
+        /home/rocketmq/proxy-logs /home/rocketmq/namesrv-logs
+    volumes:
+      - campus-trade-broker-store:/home/rocketmq/store
+      - campus-trade-broker-logs:/home/rocketmq/broker-logs
+      - campus-trade-proxy-logs:/home/rocketmq/proxy-logs
+      - campus-trade-namesrv-logs:/home/rocketmq/namesrv-logs
+
   broker:
     image: apache/rocketmq:5.3.2
     container_name: campus-trade-broker
     profiles: ["rocketmq"]
     restart: unless-stopped
     depends_on:
-      namesrv:
-        condition: service_started
+      rocketmq-permissions:
+        condition: service_completed_successfully
     command: ["sh", "-c", "sh mqbroker -c /home/rocketmq/rocketmq-5.3.2/conf/broker.conf; tail -f /dev/null"]
     ports:
       - "${ROCKETMQ_BROKER_PORT:-10911}:10911"
@@ -60,6 +82,26 @@ services:
       - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf:ro
       - campus-trade-broker-store:/home/rocketmq/store
       - campus-trade-broker-logs:/home/rocketmq/logs
+
+  topic-init:
+    image: apache/rocketmq:5.3.2
+    container_name: campus-trade-topic-init
+    profiles: ["rocketmq"]
+    restart: "no"
+    depends_on:
+      broker:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - >-
+        until sh mqadmin clusterList -n namesrv:9876 | grep -q broker-a;
+        do sleep 2; done;
+        if sh mqadmin topicList -n namesrv:9876 | grep -qx
+        campus_trade_order_timeout; then exit 0; fi;
+        sh mqadmin updateTopic -n namesrv:9876
+        -t campus_trade_order_timeout -c DefaultCluster
+        -a '+message.type=DELAY'
 
   proxy:
     image: apache/rocketmq:5.3.2
@@ -71,11 +113,29 @@ services:
         condition: service_started
       broker:
         condition: service_started
+      topic-init:
+        condition: service_completed_successfully
     command: ["sh", "-c", "sh mqproxy -n namesrv:9876; tail -f /dev/null"]
     ports:
       - "${ROCKETMQ_PROXY_PORT:-8081}:8081"
     volumes:
       - campus-trade-proxy-logs:/home/rocketmq/logs
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: campus-trade-nginx
+    profiles: ["production"]
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    depends_on:
+      topic-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/campus-trade.conf:/etc/nginx/nginx.conf:ro
 
 volumes:
   campus-trade-mysql-data:
