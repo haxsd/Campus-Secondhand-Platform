@@ -36,7 +36,12 @@ try {
 
     $backendStdout = Join-Path $env:TEMP 'campus-trade-backend.out.log'
     $backendStderr = Join-Path $env:TEMP 'campus-trade-backend.err.log'
-    $backend = Start-Process java -ArgumentList "-Duser.timezone=Asia/Shanghai", "-jar", "`"$($jar.FullName)`"" `
+    $javaCommand = Get-Command java -ErrorAction SilentlyContinue
+    if (-not $javaCommand -and $env:JAVA_HOME) {
+        $javaCommand = Get-Command (Join-Path $env:JAVA_HOME 'bin\java.exe') -ErrorAction SilentlyContinue
+    }
+    if (-not $javaCommand) { throw 'Java 17 was not found. Set JAVA_HOME or add java.exe to PATH.' }
+    $backend = Start-Process $javaCommand.Source -ArgumentList "-Duser.timezone=Asia/Shanghai", "-jar", "`"$($jar.FullName)`"" `
         -WorkingDirectory $ProjectRoot -RedirectStandardOutput $backendStdout `
         -RedirectStandardError $backendStderr -PassThru
     $backend.Id | Set-Content (Join-Path $env:TEMP 'campus-trade-backend.pid')
