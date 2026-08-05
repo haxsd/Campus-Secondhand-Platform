@@ -53,21 +53,43 @@
     </insert>
 
     <!-- status 为 null 时不加过滤条件，表示查询全部状态。 -->
-    <select id="selectPage" resultType="com.campus.trade.dispute.entity.Dispute">
-        SELECT
-        <include refid="disputeColumns"/>
-        FROM dispute
+    <select id="selectAdminCursorPage" resultType="com.campus.trade.dispute.model.AdminDisputeRow">
+        <!--
+            一次 JOIN 取齐订单、商品和双方用户，避免每条纠纷分别执行 4 次补充查询。
+            LEFT JOIN 兼容历史关联数据缺失；evidence_json 仍由 Service 转换为接口中的 List<String>。
+        -->
+        SELECT d.id,
+               d.order_id,
+               d.reason_type,
+               d.statement,
+               d.evidence AS evidence_json,
+               d.status,
+               d.created_at,
+               o.order_no,
+               o.status AS order_status,
+               p.title AS product_title,
+               buyer.nickname AS buyer_name,
+               seller.nickname AS seller_name
+        FROM dispute d
+        LEFT JOIN trade_order o ON o.id = d.order_id
+        LEFT JOIN product p ON p.id = o.product_id
+        LEFT JOIN `user` buyer ON buyer.id = o.buyer_id
+        LEFT JOIN `user` seller ON seller.id = o.seller_id
         <where>
-            <if test="status != null">status = #{status}</if>
+            <if test="status != null">d.status = #{status}</if>
+            <if test="cursorCreatedAt != null">
+                <!--
+                    created_at 可能相同，必须用 id 作为第二排序键；否则翻页会遗漏或重复同一秒创建的纠纷。
+                    控制器已保证 cursorCreatedAt 与 cursorId 要么同时传入，要么同时为空。
+                -->
+                AND (
+                    d.created_at &lt; #{cursorCreatedAt}
+                    OR (d.created_at = #{cursorCreatedAt} AND d.id &lt; #{cursorId})
+                )
+            </if>
         </where>
-        ORDER BY created_at DESC, id DESC
-        LIMIT #{pageSize} OFFSET #{offset}
-    </select>
-
-    <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM dispute
-        <if test="status != null">WHERE status = #{status}</if>
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT #{limit}
     </select>
 
     <!--

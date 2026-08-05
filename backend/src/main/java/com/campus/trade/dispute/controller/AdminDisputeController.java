@@ -1,6 +1,8 @@
 package com.campus.trade.dispute.controller;
 
-import com.campus.trade.common.response.PageResult;
+import com.campus.trade.common.exception.BizException;
+import com.campus.trade.common.exception.ErrorCode;
+import com.campus.trade.common.response.CursorPageResult;
 import com.campus.trade.common.response.Result;
 import com.campus.trade.dispute.dto.HandleDisputeRequest;
 import com.campus.trade.dispute.service.DisputeService;
@@ -8,6 +10,7 @@ import com.campus.trade.dispute.vo.AdminDisputeVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
 
 /**
  * 管理端纠纷接口：查看纠纷列表与裁决。
@@ -34,14 +39,24 @@ public class AdminDisputeController {
         this.disputeService = disputeService;
     }
 
-    /** 分页查看纠纷，可按纠纷状态 0~4 过滤。 */
+    /**
+     * 游标分页查看纠纷，可按纠纷状态 0~4 过滤。
+     *
+     * <p>首次请求不传游标；下一页同时传入上一页响应中的 cursorCreatedAt 和 cursorId。
+     * 两个字段缺一不可，避免后端按不稳定条件翻页。</p>
+     */
     @GetMapping
-    public Result<PageResult<AdminDisputeVO>> list(
+    public Result<CursorPageResult<AdminDisputeVO>> list(
             @RequestParam(required = false) @Min(0) @Max(4) Integer status,
-            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(required = false)
+            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) @Min(1) Long cursorId,
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int pageSize
     ) {
-        return Result.ok(disputeService.list(status, page, pageSize));
+        if ((cursorCreatedAt == null) != (cursorId == null)) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "游标时间和游标 ID 必须同时传入");
+        }
+        return Result.ok(disputeService.list(status, cursorCreatedAt, cursorId, pageSize));
     }
 
     /** 裁决纠纷，具体动作见 HandleDisputeRequest.action。 */

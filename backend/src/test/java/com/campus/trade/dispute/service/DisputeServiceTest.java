@@ -5,6 +5,8 @@ import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.dispute.dto.CreateDisputeRequest;
 import com.campus.trade.dispute.mapper.DisputeMapper;
+import com.campus.trade.dispute.model.AdminDisputeRow;
+import com.campus.trade.dispute.vo.AdminDisputeVO;
 import com.campus.trade.dispute.vo.DisputeCreatedVO;
 import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.mapper.OrderMapper;
@@ -32,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -140,6 +143,56 @@ class DisputeServiceTest {
                 .isInstanceOf(BizException.class)
                 .extracting(exception -> ((BizException) exception).getCode())
                 .isEqualTo(403);
+    }
+
+    @Test
+    void shouldBuildAdminListFromJoinResultWithoutPerRowQueries() {
+        AdminDisputeRow row = new AdminDisputeRow();
+        row.setId(701L);
+        row.setOrderId(ORDER_ID);
+        row.setReasonType(0);
+        row.setStatement("商品与描述不符");
+        row.setEvidenceJson("[\"/api/uploads/evidence.jpg\"]");
+        row.setStatus(0);
+        row.setOrderNo("O202607270001");
+        row.setProductTitle("机械键盘");
+        row.setBuyerName("买家A");
+        row.setSellerName("卖家B");
+        row.setOrderStatus(OrderStatus.IN_DISPUTE.getCode());
+        row.setCreatedAt(LocalDateTime.now());
+        when(disputeMapper.selectAdminCursorPage(0, null, null, 21)).thenReturn(List.of(row));
+
+        var page = disputeService.list(0, null, null, 20);
+
+        AdminDisputeVO result = page.list().get(0);
+        assertThat(result.orderNo()).isEqualTo("O202607270001");
+        assertThat(result.productTitle()).isEqualTo("机械键盘");
+        assertThat(result.evidence()).containsExactly("/api/uploads/evidence.jpg");
+        assertThat(page.hasNext()).isFalse();
+        // 订单、商品和用户数据已经由 JOIN SQL 返回，Service 不应再执行逐行查询。
+        verifyNoInteractions(orderMapper, productMapper, userMapper);
+    }
+
+    @Test
+    void shouldUseLastReturnedRowAsNextCursor() {
+        LocalDateTime newestTime = LocalDateTime.of(2026, 7, 27, 12, 0);
+        AdminDisputeRow newest = new AdminDisputeRow();
+        newest.setId(702L);
+        newest.setCreatedAt(newestTime);
+        AdminDisputeRow probeRow = new AdminDisputeRow();
+        probeRow.setId(701L);
+        probeRow.setCreatedAt(newestTime.minusSeconds(1));
+        // pageSize=1 时多取一条，第二条只用于判断还有下一页，不能作为下一页游标。
+        when(disputeMapper.selectAdminCursorPage(0, null, null, 2))
+                .thenReturn(List.of(newest, probeRow));
+
+        var page = disputeService.list(0, null, null, 1);
+
+        assertThat(page.list()).hasSize(1);
+        assertThat(page.list().get(0).id()).isEqualTo(702L);
+        assertThat(page.hasNext()).isTrue();
+        assertThat(page.nextCursorCreatedAt()).isEqualTo(newestTime);
+        assertThat(page.nextCursorId()).isEqualTo(702L);
     }
 
     private CreateDisputeRequest request() {

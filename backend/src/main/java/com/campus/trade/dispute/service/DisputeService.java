@@ -3,12 +3,13 @@ package com.campus.trade.dispute.service;
 import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.common.exception.ErrorCode;
-import com.campus.trade.common.response.PageResult;
+import com.campus.trade.common.response.CursorPageResult;
 import com.campus.trade.dispute.dto.CreateDisputeRequest;
 import com.campus.trade.dispute.dto.HandleDisputeRequest;
 import com.campus.trade.dispute.entity.Dispute;
 import com.campus.trade.dispute.mapper.DisputeMapper;
 import com.campus.trade.dispute.model.DisputeRules;
+import com.campus.trade.dispute.model.AdminDisputeRow;
 import com.campus.trade.dispute.vo.AdminDisputeVO;
 import com.campus.trade.dispute.vo.DisputeCreatedVO;
 import com.campus.trade.order.entity.TradeOrder;
@@ -24,6 +25,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -242,24 +244,46 @@ public class DisputeService {
         }
     }
 
-    /** 管理端纠纷分页列表，附带订单号、商品标题和买卖双方昵称，便于管理员直接判断。 */
-    public PageResult<AdminDisputeVO> list(Integer status, int page, int pageSize) {
-        int offset = (page - 1) * pageSize;
-        List<AdminDisputeVO> list = disputes.selectPage(status, pageSize, offset)
-                .stream()
+    /**
+     * 管理端纠纷游标分页列表，附带订单号、商品标题和买卖双方昵称。
+     *
+     * <p>一次多取一条记录：前 {@code pageSize} 条用于展示，多出的第 {@code pageSize + 1} 条
+     * 只用于判断是否存在下一页。这样无需额外执行 COUNT(*)，也不会因为 OFFSET 很大而扫描大量
+     * 已跳过的旧记录。</p>
+     */
+    public CursorPageResult<AdminDisputeVO> list(
+            Integer status,
+            LocalDateTime cursorCreatedAt,
+            Long cursorId,
+            int pageSize
+    ) {
+        List<AdminDisputeRow> rows = disputes.selectAdminCursorPage(
+                status,
+                cursorCreatedAt,
+                cursorId,
+                pageSize + 1
+        );
+        boolean hasNext = rows.size() > pageSize;
+        List<AdminDisputeRow> currentRows = hasNext ? rows.subList(0, pageSize) : rows;
+        List<AdminDisputeVO> list = currentRows.stream()
                 .map(this::toAdminVO)
                 .toList();
-        return new PageResult<>(list, disputes.count(status), page, pageSize);
+
+        if (!hasNext) {
+            return new CursorPageResult<>(list, false, null, null);
+        }
+        // 下一页从当前页最后一条记录之后继续读取，而不是从多取出的探测记录开始。
+        AdminDisputeRow lastRow = currentRows.get(currentRows.size() - 1);
+        return new CursorPageResult<>(list, true, lastRow.getCreatedAt(), lastRow.getId());
     }
 
     /**
-     * 把纠纷记录补齐成管理端需要的展示对象。
+     * 将 JOIN SQL 的读模型转换为既有接口 VO。
      *
-     * <p>注意：这里对每条纠纷都会再查订单、商品和买卖双方，属于典型的 N+1 查询。
-     * 当前管理端纠纷量很小，可以接受；数据量上来后应改为在 XML 里一次 JOIN 查出。</p>
+     * <p>订单、商品和用户字段已在 Mapper 中一次查出；此处只负责解析 evidence JSON，
+     * 不再执行任何数据库查询。</p>
      */
-    private AdminDisputeVO toAdminVO(Dispute dispute) {
-        TradeOrder order = orders.selectById(dispute.getOrderId()).orElse(null);
+    private AdminDisputeVO toAdminVO(AdminDisputeRow dispute) {
         return new AdminDisputeVO(
                 dispute.getId(),
                 dispute.getOrderId(),
@@ -267,14 +291,11 @@ public class DisputeService {
                 dispute.getStatement(),
                 readEvidence(dispute.getEvidenceJson()),
                 dispute.getStatus(),
-                order == null ? "" : order.getOrderNo(),
-                order == null ? "" : products.selectById(order.getProductId())
-                        .map(product -> product.getTitle()).orElse(""),
-                order == null ? "" : users.selectById(order.getBuyerId())
-                        .map(user -> user.getNickname()).orElse(""),
-                order == null ? "" : users.selectById(order.getSellerId())
-                        .map(user -> user.getNickname()).orElse(""),
-                order == null ? null : order.getStatus(),
+                nullToEmpty(dispute.getOrderNo()),
+                nullToEmpty(dispute.getProductTitle()),
+                nullToEmpty(dispute.getBuyerName()),
+                nullToEmpty(dispute.getSellerName()),
+                dispute.getOrderStatus(),
                 dispute.getCreatedAt()
         );
     }
@@ -319,6 +340,11 @@ public class DisputeService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** JOIN 的关联字段可能因历史脏数据为 null，沿用改造前列表接口返回空字符串的契约。 */
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private BizException conflict(String message) {

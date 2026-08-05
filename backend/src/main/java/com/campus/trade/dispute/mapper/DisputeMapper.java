@@ -1,11 +1,13 @@
 package com.campus.trade.dispute.mapper;
 
 import com.campus.trade.dispute.entity.Dispute;
+import com.campus.trade.dispute.model.AdminDisputeRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 /**
  * 纠纷数据访问接口，SQL 写在 resources/mapper/dispute/DisputeMapper.xml。
@@ -23,14 +25,16 @@ public interface DisputeMapper {
 
     int insert(Dispute dispute);
 
-    /** 管理端分页查询，status 为 null 时表示不限状态。 */
-    List<Dispute> selectPage(
+    /**
+     * 管理端游标分页查询；status 为 null 时表示不限状态。
+     * SQL 一次关联订单、商品和买卖双方，游标由上一页末尾的 (createdAt, id) 组成。
+     */
+    List<AdminDisputeRow> selectAdminCursorPage(
             @Param("status") Integer status,
-            @Param("pageSize") int pageSize,
-            @Param("offset") int offset
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            @Param("limit") int limit
     );
-
-    long count(@Param("status") Integer status);
 
     /**
      * 条件更新纠纷处理结果。
