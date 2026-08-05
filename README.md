@@ -1,159 +1,172 @@
-### Deployment notes
+# 校园二手交易平台
 
-The production deployment requires Java 17 or newer, Node.js, Docker Desktop, and Windows
-PowerShell. nginx runs in Docker by default, so the host does not need a local
-nginx installation. JDK 25 has been verified to build, test, and run this
-Spring Boot 3.5.16 project whose compiler target is `release 17`. The JVM and
-MySQL must both run in `Asia/Shanghai`;
-otherwise `CURRENT_TIMESTAMP` and order confirmation deadlines can drift.
-
-从工程根目录开始的完整本机操作步骤见
-[`deploy/本机部署手册.md`](deploy/本机部署手册.md)。该手册覆盖 Docker
-前置检查、已有 MySQL/Redis 容器复用、RocketMQ 独立编排、后端打包、
-nginx 启动和黄金路径演示。
-
-快速路径：
-
-```powershell
-Copy-Item deploy/.env.example deploy/.env
-# Edit deploy/.env and replace CT_DB_PASSWORD and CT_JWT_SECRET.
-.\deploy\build.ps1
-.\deploy\start.ps1
-```
-
-`deploy/docker-compose.yml` 负责 MySQL、Redis 和 nginx；独立的
-`rocketmq/docker-compose.yml` 负责 NameServer、Broker、Proxy 以及两个
-初始化服务。RocketMQ topic 初始化和 volume 权限处理会自动完成。
-如果本机已经有 `ct-mysql`、`ct-redis` 占用 3306/6379，请按操作手册跳过
-Compose 中的 MySQL/Redis，仅复用并检查已有容器。
-
-打开 `http://localhost/`；`/api` 和 `/uploads` 会由 nginx 反代到后端。
-停止本项目服务：
-
-```powershell
-.\deploy\stop.ps1
-```
-
-RocketMQ 5 使用 Proxy 地址 `127.0.0.1:8081` 和 NameServer 端口 `9876`。
-超时 topic 为 `campus_trade_order_timeout`，独立编排中的 topic-init 会将其
-自动创建为 DELAY topic，不需要手工执行 `mqadmin`。
-
-Demo accounts are seeded by `deploy/sql/initial-data.sql`:
-
-```text
-admin001 / Campus@2026
-20230001 through 20230012 / Campus@2026
-```
-# 校园二手交易平台（Campus Secondhand Platform）
-
-校园二手交易全栈项目：信息撮合 + 线下面交，支持用户注册登录、商品发布与人工审核、库存下单、订单状态机、评价信用与纠纷处理。
-
-## 技术栈
-
-- **后端**：Java 17 + Spring Boot 3 + MyBatis + MySQL 8 + Redis 7（Redisson）
-- **前端**：Vue 3 + Vite + Pinia + Vue Router + Element Plus + Axios
-- **部署**：Docker Compose + Nginx
+这是一个面向校内场景的校园二手交易平台，采用 Spring Boot 单体后端和
+Vue 3 前端，为学生提供商品发布、审核、下单、线下见面交易、评价和纠纷处理
+能力。平台只负责校内信息撮合和交易过程管理，**不包含在线支付、退款、物流或
+资金托管**；实际交易在线下完成。
 
 ## 目录结构
 
 ```text
-├── backend/    Spring Boot 后端
-├── frontend/   Vue 3 前端
-├── docs/       设计文档（前端设计 / 后端设计 / API 契约 / 数据库设计）
-└── deploy/     部署配置（docker-compose / nginx / 建表 SQL）
+.
+├─ backend/
+│  ├─ src/main/java/com/campus/trade/
+│  │  ├─ auth/             认证、登录态和 JWT
+│  │  ├─ product/          商品发布、审核、库存和详情
+│  │  ├─ order/            下单、订单状态机和超时关单
+│  │  ├─ review/           交易评价和信用分
+│  │  ├─ dispute/          纠纷申请、证据和管理员处理
+│  │  ├─ file/             本地文件上传和访问
+│  │  └─ config/           Redis、JWT、Web 和文件存储等配置
+│  ├─ src/main/resources/
+│  │  └─ mapper/           MyBatis XML 映射文件
+│  └─ docs/                 后端工程学习资料和数据库升级记录
+├─ frontend/
+│  ├─ src/api/              后端 API 封装，支持真实接口和 Mock 切换
+│  ├─ src/mock/             Mock 数据和本地演示接口
+│  ├─ src/views/            页面级 Vue 视图
+│  ├─ src/stores/           Pinia 状态管理
+│  ├─ src/router/           前端路由
+│  └─ src/components/       可复用业务组件
+├─ docs/
+│  ├─ API接口文档.md        HTTP API、请求参数和响应说明
+│  ├─ 前端设计文档.md       前端页面、交互和视觉设计
+│  ├─ 后端设计文档.md       后端模块、流程和实现设计
+│  └─ 数据库设计文档.md     表结构、关系和索引设计
+└─ deploy/
+   ├─ sql/                  MySQL 初始化数据和测试种子数据
+   ├─ nginx/                nginx 静态文件和 API 反向代理配置
+   ├─ rocketmq/             RocketMQ 独立 Compose 和 broker.conf
+   ├─ docker-compose.yml    MySQL、Redis、nginx 编排
+   ├─ build.ps1             构建后端 JAR 和前端 dist
+   ├─ start.ps1             启动依赖、RocketMQ、nginx 和后端
+   ├─ stop.ps1              停止本项目服务
+   ├─ .env.example          本机部署配置模板
+   └─ 本机部署手册.md       Windows PowerShell 分步部署说明
 ```
 
-## 开发约定
+`backend/`、`frontend/` 是应用源码，`docs/` 是设计和接口资料，`deploy/` 是
+本机运行所需的基础设施和脚本。RocketMQ 保持独立 Compose，不合并进
+`deploy/docker-compose.yml`。
 
-- 前后端所有接口以 `docs/API接口文档.md` 为唯一契约：先改文档，再改代码。
-- 数据库结构见 `docs/数据库设计文档.md`，建表脚本 `deploy/sql/init.sql`。
-- 前端设计见 `docs/前端设计文档.md`，后端设计与部署见 `docs/后端设计文档.md`。
+## 技术栈
 
-## 本地启动（开发期）
+### 后端
 
-```bash
-# 1. 启动依赖（MySQL + Redis）
-docker run -d --name ct-mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=<你的密码> mysql:8
-docker run -d --name ct-redis -p 6379:6379 redis:7
-# 2. 建表：执行 deploy/sql/init.sql
-# 3. 前端
-cd frontend && npm install && npm run dev
-# 4. 后端（IDEA 直接运行，或）
-cd backend && mvn spring-boot:run
+- Java 17+，Spring Boot 3.5
+- MyBatis（不是 MyBatis-Plus）
+- MySQL 8、Redis 7
+- Caffeine + Redis 二级缓存
+- Redisson 分布式锁和并发控制
+- JWT 登录认证
+- RocketMQ 5.3.2：订单超时延迟消息，定时扫描任务兜底
+- Spring Boot Actuator 健康检查
+
+### 前端
+
+- Vue 3
+- Vite
+- Pinia
+- Vue Router
+- Element Plus
+- Axios
+
+## 核心能力
+
+- JWT + Redis 保存登录态并支持会话失效；
+- Caffeine + Redis 二级缓存，结合 Redisson 防止缓存击穿；
+- 下单使用 `requestId` 和数据库唯一约束保证幂等，库存通过条件更新防止超卖；
+- 订单状态机约束待确认、已确认、已完成、取消和纠纷状态流转；
+- RocketMQ 延迟消息驱动订单超时关单，定时扫描任务负责兜底；
+- 交易完成后评价并更新信用分；
+- 纠纷申请、证据链和管理员处理记录；
+- 本地文件上传，使用文件魔数校验内容类型。
+
+## Compose 编排
+
+Compose 文件用 YAML 描述多个容器、网络、卷和健康依赖，可以通过一条命令
+创建并启动一组服务。本项目两个 Compose 文件都固定使用项目名：
+
+```text
+campus-trade
 ```
 
-## 本机生产部署
+其中：
 
-### 环境要求
+- `deploy/docker-compose.yml` 管理 MySQL、Redis 和 nginx；
+- `deploy/rocketmq/docker-compose.yml` 管理 NameServer、Broker、Proxy、
+  `rocketmq-permissions` 和 `topic-init`；
+- RocketMQ 会自动初始化 `campus_trade_order_timeout` 延迟 Topic；
+- 不要使用 `--remove-orphans`，避免误处理其他 Compose 项目的容器。
 
-- JDK 17（项目固定以 Java 17 编译）
-- Node.js 22.18+ 或 24.12+
-- Docker Desktop（MySQL、Redis、RocketMQ）
-- Windows PowerShell
-- nginx（加入 PATH）
+## 快速开始
 
-### 一键启动
-
-首次部署时复制配置模板并修改本机配置：
+以下命令均从工程根目录执行。首次构建会下载 Maven、Node 依赖和 Docker 镜像，
+可能需要较长时间。
 
 ```powershell
-Copy-Item deploy/.env.example deploy/.env
-notepad deploy/.env
-```
+Copy-Item deploy\.env.example deploy\.env
+notepad deploy\.env
 
-至少需要修改：
-
-- `CT_DB_PASSWORD`
-- `CT_JWT_SECRET`
-- `CT_UPLOAD_DIR`
-
-然后执行：
-
-```powershell
 .\deploy\build.ps1
 .\deploy\start.ps1
 ```
 
-访问地址：
+然后访问：
 
 ```text
-http://localhost/
+http://localhost
 ```
 
-停止服务：
+停止本项目：
 
 ```powershell
 .\deploy\stop.ps1
 ```
 
-`deploy/start.ps1` 会启动 MySQL、Redis、RocketMQ NameServer、Broker、Proxy、Spring Boot JAR；nginx 使用 `deploy/nginx/campus-trade.conf` 托管 `frontend/dist` 并反向代理后端。
+如果本机已经存在 `ct-mysql` 或 `ct-redis` 并占用 3306/6379，不要直接启动
+Compose 中对应的 MySQL/Redis 服务，应按手册检查并复用已有容器。
 
-### 测试账号
-
-初始化脚本中的测试账号密码均为：
+完整的前置检查、环境变量、已有容器复用、RocketMQ 验证、数据库初始化、黄金
+路径和故障排查，请阅读：
 
 ```text
-管理员：admin001 / Campus@2026
-普通用户：20230001 至 20230012 / Campus@2026
+deploy/本机部署手册.md
 ```
 
-账号来源：`deploy/sql/initial-data.sql`。
+## 测试账号
 
-### 手动打包部署
+测试账号由 `deploy/sql/initial-data.sql` 初始化，统一密码为：
+
+```text
+Campus@2026
+```
+
+账号：
+
+```text
+管理员：admin001
+普通用户：20230001 - 20230012
+```
+
+## 构建与测试
+
+后端使用 Maven Wrapper，不要求预装 Maven：
 
 ```powershell
 .\backend\mvnw.cmd -B clean package -DskipTests
+.\backend\mvnw.cmd -B test -DrunExternalTests=true
+```
+
+前端命令：
+
+```powershell
 Push-Location frontend
 npm ci
+npm run lint
 npm run build
 Pop-Location
 ```
 
-后端生产 profile 通过环境变量启用：
-
-```powershell
-$env:CT_PROFILE = "prod"
-java -jar backend\target\campus-trade-0.0.1-SNAPSHOT.jar
-```
-
-生产配置文件为 `backend/src/main/resources/application-prod.yml`。数据库、Redis、JWT、上传目录和 RocketMQ 均使用 `CT_*` 环境变量，不应把真实密钥写入脚本或仓库。
+前端生产构建产物位于 `frontend/dist/`，该目录由用户本机自行构建，不纳入
+版本管理。
