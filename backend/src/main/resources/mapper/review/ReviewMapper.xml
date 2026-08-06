@@ -1,8 +1,65 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.campus.trade.review.mapper.ReviewMapper">
-    <select id="existsByOrderId" resultType="boolean">SELECT EXISTS(SELECT 1 FROM trade_review WHERE order_id=#{orderId})</select>
-    <insert id="insert" parameterType="com.campus.trade.review.entity.TradeReview" useGeneratedKeys="true" keyProperty="id">INSERT INTO trade_review (order_id,reviewer_id,seller_id,rating,content,tags,visible) VALUES (#{orderId},#{reviewerId},#{sellerId},#{rating},#{content},#{tags},#{visible})</insert>
-    <update id="recalculateSellerCredit">UPDATE user_credit_summary cs JOIN (SELECT seller_id, COUNT(*) review_count, COALESCE(AVG(rating),0) avg_rating, COALESCE(AVG(rating &gt;= 4),0) good_rate, COALESCE(SUM(rating &gt;= 4),0) good_count, COALESCE(SUM(rating &lt;= 2),0) bad_count FROM trade_review WHERE seller_id=#{sellerId} AND visible=1 GROUP BY seller_id) r ON r.seller_id=cs.user_id SET cs.review_count=r.review_count, cs.avg_rating=r.avg_rating, cs.good_review_rate=r.good_rate, cs.bad_review_count=r.bad_count, cs.credit_score=LEAST(100,GREATEST(60,100+r.good_count-3*r.bad_count)), cs.calculated_at=CURRENT_TIMESTAMP, cs.version=cs.version+1 WHERE cs.user_id=#{sellerId}</update>
-    <select id="selectByOrderId" resultType="com.campus.trade.review.entity.TradeReview">SELECT id, order_id, reviewer_id, seller_id, rating, content, tags, visible, created_at FROM trade_review WHERE order_id=#{orderId} LIMIT 1</select>
+
+    <select id="existsByOrderId" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM trade_review WHERE order_id = #{orderId})
+    </select>
+
+    <insert id="insert"
+            parameterType="com.campus.trade.review.entity.TradeReview"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO trade_review (order_id,
+                                  reviewer_id,
+                                  seller_id,
+                                  rating,
+                                  content,
+                                  tags,
+                                  visible)
+        VALUES (#{orderId},
+                #{reviewerId},
+                #{sellerId},
+                #{rating},
+                #{content},
+                #{tags},
+                #{visible})
+    </insert>
+
+    <!--
+        依据该卖家全部可见评价，一次性重算整份信用摘要。
+
+        为什么是“整体重算”而不是“在原值上加一条”：
+        摘要表只是为了读得快而存在的冗余数据，原始事实是 trade_review 表。
+        整体重算保证摘要永远可以从原始数据还原，即使中途出过错、或管理员隐藏了某条评价，
+        下一次重算也会自动纠正；增量累加一旦错一次就会永久跑偏。
+
+        子查询里的三个统计口径：
+          AVG(rating >= 4) —— 布尔值在 MySQL 里是 1/0，取平均即“好评占比”
+          SUM(rating <= 2) —— 差评条数
+          SUM(rating >= 4) —— 好评条数，仅用于下面的信用分公式
+
+        信用分公式与《数据库设计文档》一致：100 + 好评数 - 3 × 差评数，并裁剪到 [60, 100]。
+    -->
+    <update id="recalculateSellerCredit">
+        UPDATE user_credit_summary cs
+        JOIN (SELECT seller_id,
+                     COUNT(*)                        review_count,
+                     COALESCE(AVG(rating), 0)        avg_rating,
+                     COALESCE(AVG(rating &gt;= 4), 0) good_rate,
+                     COALESCE(SUM(rating &gt;= 4), 0) good_count,
+                     COALESCE(SUM(rating &lt;= 2), 0) bad_count
+              FROM trade_review
+              WHERE seller_id = #{sellerId}
+                AND visible = 1
+              GROUP BY seller_id) r ON r.seller_id = cs.user_id
+        SET cs.review_count     = r.review_count,
+            cs.avg_rating       = r.avg_rating,
+            cs.good_review_rate = r.good_rate,
+            cs.bad_review_count = r.bad_count,
+            cs.credit_score     = LEAST(100, GREATEST(60, 100 + r.good_count - 3 * r.bad_count)),
+            cs.calculated_at    = CURRENT_TIMESTAMP,
+            cs.version          = cs.version + 1
+        WHERE cs.user_id = #{sellerId}
+    </update>
 </mapper>

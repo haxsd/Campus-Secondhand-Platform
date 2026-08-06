@@ -1,14 +1,131 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.campus.trade.user.mapper.UserMapper">
-    <sql id="userColumns">id, student_no, phone, password, nickname, avatar, campus, role, status, created_at, updated_at</sql>
-    <select id="selectByAccount" resultType="com.campus.trade.user.entity.User">SELECT <include refid="userColumns"/> FROM `user` WHERE student_no=#{account} OR phone=#{account} LIMIT 1</select>
-    <select id="selectById" resultType="com.campus.trade.user.entity.User">SELECT <include refid="userColumns"/> FROM `user` WHERE id=#{id} LIMIT 1</select>
-    <select id="existsByStudentNoOrPhone" resultType="boolean">SELECT EXISTS(SELECT 1 FROM `user` WHERE student_no=#{studentNo} OR phone=#{phone})</select>
-    <insert id="insert" parameterType="com.campus.trade.user.entity.User" useGeneratedKeys="true" keyProperty="id">INSERT INTO `user` (student_no,phone,password,nickname,avatar,campus,role,status) VALUES (#{studentNo},#{phone},#{password},#{nickname},#{avatar},#{campus},#{role},#{status})</insert>
-    <insert id="insertCreditSummary">INSERT INTO user_credit_summary (user_id) VALUES (#{userId})</insert>
-    <update id="incrementDealCount">UPDATE user_credit_summary SET deal_count=deal_count+1 WHERE user_id=#{userId}</update>
-    <update id="updateProfile" parameterType="com.campus.trade.user.entity.User">UPDATE `user` SET nickname=#{nickname}, avatar=#{avatar}, campus=#{campus} WHERE id=#{id}</update>
-    <update id="updatePassword">UPDATE `user` SET password=#{password} WHERE id=#{userId}</update>
-    <select id="selectCreditSummary" resultType="com.campus.trade.user.entity.CreditSummary">SELECT user_id, credit_score, deal_count, review_count, avg_rating, good_review_rate, bad_review_count FROM user_credit_summary WHERE user_id=#{userId} LIMIT 1</select>
+
+    <!--
+        可复用的用户列清单。
+        登录查询明确列出字段，避免 SELECT *，也避免 user 表扩展后无意读取大字段。
+        application.yml 已开启下划线转驼峰，例如 student_no 会映射到 studentNo。
+    -->
+    <sql id="userColumns">
+        id,
+        student_no,
+        phone,
+        password,
+        nickname,
+        avatar,
+        campus,
+        role,
+        status,
+        created_at,
+        updated_at
+    </sql>
+
+    <!--
+        account 既可能是学号，也可能是手机号。
+        两种字段都有唯一索引，因此理论上最多返回一行；LIMIT 1 进一步表达这一语义。
+    -->
+    <select id="selectByAccount"
+            resultType="com.campus.trade.user.entity.User">
+        SELECT
+        <include refid="userColumns"/>
+        FROM `user`
+        WHERE student_no = #{account}
+           OR phone = #{account}
+        LIMIT 1
+    </select>
+
+    <!-- 个人中心使用 JWT 中可信的 userId 查询当前用户最新资料。 -->
+    <select id="selectById"
+            resultType="com.campus.trade.user.entity.User">
+        SELECT
+        <include refid="userColumns"/>
+        FROM `user`
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <!--
+        注册前的友好预查。SELECT EXISTS 找到第一条匹配记录后即可停止，
+        不需要像 COUNT(*) 那样统计所有行。并发正确性最终仍由唯一索引保证。
+    -->
+    <select id="existsByStudentNoOrPhone" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM `user`
+            WHERE student_no = #{studentNo}
+               OR phone = #{phone}
+        )
+    </select>
+
+    <!--
+        useGeneratedKeys=true 使用 MySQL 自增主键；
+        keyProperty=id 表示插入后把生成的主键回填到 User.id。
+    -->
+    <insert id="insert"
+            parameterType="com.campus.trade.user.entity.User"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO `user` (
+            student_no,
+            phone,
+            password,
+            nickname,
+            avatar,
+            campus,
+            role,
+            status
+        )
+        VALUES (
+            #{studentNo},
+            #{phone},
+            #{password},
+            #{nickname},
+            #{avatar},
+            #{campus},
+            #{role},
+            #{status}
+        )
+    </insert>
+
+    <!--
+        信用摘要采用数据库默认值初始化，避免默认分散在 Java 代码中。
+        本 SQL 与用户 INSERT 由 AuthService.register 的同一个事务包裹。
+    -->
+    <insert id="insertCreditSummary">
+        INSERT INTO user_credit_summary (user_id)
+        VALUES (#{userId})
+    </insert>
+
+    <!-- 订单完成后只累加成交次数；平均分和好评率由评价模块完成后再单独维护。 -->
+    <update id="incrementDealCount">
+        UPDATE user_credit_summary
+        SET deal_count = deal_count + 1
+        WHERE user_id = #{userId}
+    </update>
+
+    <!--
+        用户只能维护显示资料。SQL 中不出现 student_no、phone、role、status 等身份字段，
+        即使恶意请求额外携带了这些字段，也不会影响数据库。
+        avatar 允许为 NULL，用于用户主动清除头像并恢复默认头像。
+    -->
+    <update id="updateProfile" parameterType="com.campus.trade.user.entity.User">
+        UPDATE `user`
+        SET nickname = #{nickname},
+            avatar = #{avatar},
+            campus = #{campus}
+        WHERE id = #{id}
+    </update>
+
+    <!--
+        密码必须始终由 Service 转换为 BCrypt 哈希后才可传入此 SQL，
+        Mapper 不接收也不处理任何明文密码。
+    -->
+    <update id="updatePassword">
+        UPDATE `user`
+        SET password = #{password}
+        WHERE id = #{userId}
+    </update>
 </mapper>

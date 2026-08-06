@@ -11,7 +11,6 @@ import { createDispute } from '@/api/dispute'
 import { ORDER_STATUS, ITEM_CONDITION, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 import OrderStatusTag from '@/components/OrderStatusTag.vue'
 import ImageUploader from '@/components/ImageUploader.vue'
-import DisputeParticipantPanel from '@/components/DisputeParticipantPanel.vue'
 
 const route = useRoute()
 const orderId = route.params.id
@@ -249,8 +248,6 @@ onMounted(loadDetail)
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
-
-        <DisputeParticipantPanel :order-id=orderId />
 
         <!-- 状态时间线 -->
         <el-card shadow="never" class="block">
