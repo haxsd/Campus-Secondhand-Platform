@@ -1,9 +1,9 @@
 <script setup>
 // 管理端·纠纷处理：列出纠纷（可按状态筛选），管理员对「待处理/待补材料」的纠纷做裁决。
 // 四种处理动作对应订单不同走向：驳回(恢复原状态)/维持完成/取消交易(可退货回补库存)/待补材料。
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getDisputeDetail, getDisputes, handleDispute } from '@/api/admin'
+import { adoptDisputeAiAssist, getDisputeAiAssist, getDisputeDetail, getDisputes, handleDispute, triggerDisputeAiAssist } from '@/api/admin'
 import { DISPUTE_STATUS, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 
 const list = ref([])
@@ -84,15 +84,68 @@ const submitting = ref(false)
 const current = ref(null) // 当前处理的纠纷行
 const detail = ref(null)
 const form = reactive({ action: 'REJECT', restock: true, note: '' })
+const aiRun = ref(null)
+let aiPollTimer = null
 
 function openHandle(row) {
   current.value = row
   detail.value = null
-  getDisputeDetail(row.id).then((value) => { detail.value = value }).catch(() => {})
+  getDisputeDetail(row.id).then(async (value) => {
+    detail.value = value
+    await loadAiAssist()
+  }).catch(() => {})
   form.action = 'REJECT'
   form.restock = true
   form.note = ''
   dialogVisible.value = true
+}
+
+async function loadAiAssist() {
+  if (!current.value) return
+  aiRun.value = await getDisputeAiAssist(current.value.id)
+  if (aiRun.value && ['PENDING', 'RUNNING'].includes(aiRun.value.status)) {
+    startAiPolling()
+  }
+}
+
+function startAiPolling() {
+  stopAiPolling()
+  aiPollTimer = window.setInterval(async () => {
+    await loadAiAssist()
+    if (!aiRun.value || !['PENDING', 'RUNNING'].includes(aiRun.value.status)) {
+      stopAiPolling()
+    }
+  }, 1500)
+}
+
+function stopAiPolling() {
+  if (aiPollTimer) {
+    window.clearInterval(aiPollTimer)
+    aiPollTimer = null
+  }
+}
+
+function parsedAiResult() {
+  if (!aiRun.value?.resultJson) return null
+  if (typeof aiRun.value.resultJson === 'object') return aiRun.value.resultJson
+  try { return JSON.parse(aiRun.value.resultJson) } catch { return null }
+}
+
+async function triggerAiAssist() {
+  if (!current.value || !detail.value || ![0, 1].includes(detail.value.status)) return
+  if (aiRun.value?.status === 'SUCCEEDED' && aiRun.value.submittedEvidenceVersion === detail.value.evidenceVersion) return
+  aiRun.value = await triggerDisputeAiAssist(current.value.id)
+  if (['PENDING', 'RUNNING'].includes(aiRun.value.status)) startAiPolling()
+}
+
+async function adoptAiAssist() {
+  const result = parsedAiResult()
+  if (!current.value || !aiRun.value?.runId || !result) return
+  await adoptDisputeAiAssist(current.value.id, aiRun.value.runId, { action: result.suggestedAction })
+  form.action = result.suggestedAction
+  form.restock = Boolean(result.suggestedRestock)
+  form.note = result.adminSummary || ''
+  ElMessage.success('已采纳建议并预填裁决表单，请确认后提交')
 }
 
 async function submitHandle() {
@@ -119,6 +172,7 @@ async function submitHandle() {
 }
 
 onMounted(loadList)
+onUnmounted(stopAiPolling)
 </script>
 
 <template>
@@ -230,6 +284,38 @@ onMounted(loadList)
             </div>
           </el-descriptions-item>
         </el-descriptions>
+
+        <el-card shadow="never" class="ai-assist-card">
+          <template #header>
+            <div class="ai-assist-head">
+              <span>AI 辅助分析</span>
+              <el-button type="primary" size="small" :disabled="!detail || ![0, 1].includes(detail.status) || (aiRun?.status === 'PENDING' || aiRun?.status === 'RUNNING')" @click="triggerAiAssist">
+                {{ aiRun?.status === 'SUCCEEDED' && aiRun?.submittedEvidenceVersion === detail?.evidenceVersion ? '查看已有建议' : '触发分析' }}
+              </el-button>
+            </div>
+          </template>
+          <p>AI 建议仅供参考，最终裁决由管理员做出。</p>
+          <el-alert v-if="aiRun?.status === 'STALE'" type="warning" :closable="false" title="该建议基于旧版证据，已失效，请重新触发分析。" />
+          <el-alert v-else-if="aiRun?.status === 'DISABLED'" type="info" :closable="false" title="纠纷 AI 辅助已关闭。" />
+          <el-alert v-else-if="aiRun && ['PENDING', 'RUNNING'].includes(aiRun.status)" type="info" :closable="false" title="分析进行中，页面会自动轮询。" />
+          <template v-if="parsedAiResult() && aiRun?.status === 'SUCCEEDED'">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="建议动作">{{ parsedAiResult().suggestedAction }}</el-descriptions-item>
+              <el-descriptions-item label="置信度">{{ parsedAiResult().confidence }}</el-descriptions-item>
+              <el-descriptions-item label="责任倾向">{{ parsedAiResult().liability }}</el-descriptions-item>
+              <el-descriptions-item label="管理员摘要">{{ parsedAiResult().adminSummary }}</el-descriptions-item>
+            </el-descriptions>
+            <p><strong>判断理由</strong></p>
+            <ul><li v-for="reason in parsedAiResult().reasons || []" :key="reason">{{ reason }}</li></ul>
+            <p><strong>核验事实（引用原文）</strong></p>
+            <ul><li v-for="fact in parsedAiResult().verifiedFacts || []" :key="fact.field + fact.quote">{{ fact.field }}：{{ fact.quote }}</li></ul>
+            <p><strong>缺失证据</strong></p>
+            <ul><li v-for="item in parsedAiResult().missingEvidence || []" :key="item">{{ item }}</li></ul>
+            <p><strong>命中规则</strong></p>
+            <ul><li v-for="rule in parsedAiResult().ruleRefs || []" :key="rule.ruleId + rule.ruleVersion">{{ rule.ruleId }} / {{ rule.title }}：{{ rule.evidence }}</li></ul>
+            <el-button type="success" @click="adoptAiAssist">采纳建议并预填裁决表单</el-button>
+          </template>
+        </el-card>
 
         <el-form label-width="80px" class="handle-form">
           <el-form-item label="处理动作">

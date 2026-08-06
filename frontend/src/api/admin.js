@@ -46,3 +46,18 @@ export function handleDispute(id, data) {
 export function getDisputeDetail(id) {
   return get(`/admin/disputes/${id}`)
 }
+
+// POST /api/admin/disputes/{id}/ai-assist —— 手动触发纠纷辅助分析
+export function triggerDisputeAiAssist(id) {
+  return post(`/admin/disputes/${id}/ai-assist`)
+}
+
+// GET /api/admin/disputes/{id}/ai-assist —— 查询最新分析运行记录
+export function getDisputeAiAssist(id) {
+  return get(`/admin/disputes/${id}/ai-assist`)
+}
+
+// POST /api/admin/disputes/{id}/ai-assist/{runId}/adopt —— 记录管理员采纳动作
+export function adoptDisputeAiAssist(id, runId, data) {
+  return post(`/admin/disputes/${id}/ai-assist/${runId}/adopt`, data)
+}

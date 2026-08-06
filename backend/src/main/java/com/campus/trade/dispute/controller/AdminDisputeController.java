@@ -5,6 +5,9 @@ import com.campus.trade.common.exception.ErrorCode;
 import com.campus.trade.common.response.CursorPageResult;
 import com.campus.trade.common.response.Result;
 import com.campus.trade.dispute.dto.HandleDisputeRequest;
+import com.campus.trade.ai.dispute.DisputeAgentAdoptRequest;
+import com.campus.trade.ai.dispute.DisputeAgentRunService;
+import com.campus.trade.ai.dispute.DisputeAgentRunView;
 import com.campus.trade.dispute.service.DisputeService;
 import com.campus.trade.dispute.vo.AdminDisputeVO;
 import com.campus.trade.dispute.vo.DisputeDetailVO;
@@ -35,9 +38,11 @@ import java.time.LocalDateTime;
 public class AdminDisputeController {
 
     private final DisputeService disputeService;
+    private final DisputeAgentRunService disputeAgentRunService;
 
-    public AdminDisputeController(DisputeService disputeService) {
+    public AdminDisputeController(DisputeService disputeService, DisputeAgentRunService disputeAgentRunService) {
         this.disputeService = disputeService;
+        this.disputeAgentRunService = disputeAgentRunService;
     }
 
     /**
@@ -68,6 +73,32 @@ public class AdminDisputeController {
     ) {
         disputeService.handle(id, request);
         return Result.ok();
+    }
+
+    /** 手动触发纠纷辅助分析；模型只产生建议，不会调用裁决逻辑。 */
+    @PostMapping("/{id}/ai-assist")
+    public Result<DisputeAgentRunView> triggerAiAssist(@PathVariable @Min(1) Long id) {
+        return Result.ok(disputeAgentRunService.trigger(id));
+    }
+
+    /** 查询最新分析运行记录，供管理员页面轮询。 */
+    @GetMapping("/{id}/ai-assist")
+    public Result<DisputeAgentRunView> latestAiAssist(@PathVariable @Min(1) Long id) {
+        return Result.ok(disputeAgentRunService.latest(id));
+    }
+
+    /**
+     * 记录管理员采纳动作。
+     *
+     * <p>这里不执行 handle，前端只把建议预填到既有表单，管理员确认后仍走唯一裁决路径。</p>
+     */
+    @PostMapping("/{id}/ai-assist/{runId}/adopt")
+    public Result<DisputeAgentRunView> adoptAiAssist(
+            @PathVariable @Min(1) Long id,
+            @PathVariable String runId,
+            @Valid @RequestBody DisputeAgentAdoptRequest request
+    ) {
+        return Result.ok(disputeAgentRunService.adopt(id, runId, request.action()));
     }
 
     @GetMapping("/{id}")

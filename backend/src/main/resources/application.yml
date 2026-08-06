@@ -72,3 +72,11 @@ ai:
     scan-delay-ms: ${AI_REVIEW_SCAN_DELAY_MS:60000}
     rule-domain: ${AI_REVIEW_RULE_DOMAIN:PRODUCT_RULE}
     auto-reject-min-confidence: ${AI_REVIEW_AUTO_REJECT_MIN_CONFIDENCE:0.8}
+
+  dispute:
+    enabled: ${DISPUTE_AI_ENABLED:false}
+    model: ${DISPUTE_AI_MODEL:deepseek-v4-flash}
+    request-timeout: ${DISPUTE_AI_REQUEST_TIMEOUT:35s}
+    stale-after: ${DISPUTE_AI_STALE_AFTER:10m}
+    retry-backoff: ${DISPUTE_AI_RETRY_BACKOFF:1s}
+    max-retries: ${DISPUTE_AI_MAX_RETRIES:1}
