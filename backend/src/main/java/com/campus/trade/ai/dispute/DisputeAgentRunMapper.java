@@ -37,12 +37,13 @@ public interface DisputeAgentRunMapper {
             @Param("resultJson") String resultJson
     );
 
-    /** 失败、输出非法和超时都通过统一状态写回。 */
+    /** 失败、输出非法和超时都通过统一状态写回，并保存截断后的模型原文。 */
     int markFailure(
             @Param("runId") String runId,
             @Param("status") String status,
             @Param("errorCode") String errorCode,
-            @Param("errorMessage") String errorMessage
+            @Param("errorMessage") String errorMessage,
+            @Param("rawResponse") String rawResponse
     );
 
     /** 当前证据或纠纷状态变化时，使运行结果失效。 */

@@ -138,7 +138,13 @@ public class DisputeAgentRunService {
         } catch (DisputeAgentTimeoutException exception) {
             persistenceService.timeout(run);
         } catch (DisputeAgentOutputInvalidException exception) {
-            persistenceService.fail(run, DisputeAgentStatus.INVALID_OUTPUT, "AI_OUTPUT_INVALID", exception.getMessage());
+            persistenceService.fail(
+                    run,
+                    DisputeAgentStatus.INVALID_OUTPUT,
+                    "AI_OUTPUT_INVALID",
+                    exception.getMessage(),
+                    exception.getRawResponse()
+            );
         } catch (DisputeAgentRetryableException exception) {
             persistenceService.fail(run, DisputeAgentStatus.FAILED, "RETRY_EXHAUSTED", exception.getMessage());
         } catch (RuntimeException exception) {

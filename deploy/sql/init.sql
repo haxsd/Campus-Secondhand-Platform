@@ -273,6 +273,7 @@ CREATE TABLE `dispute_agent_run` (
   `result_json` JSON NULL COMMENT '结构化建议结果',
   `error_code` VARCHAR(64) NULL COMMENT '错误码',
   `error_message` VARCHAR(500) NULL COMMENT '错误信息',
+  `raw_response` TEXT NULL COMMENT '模型原始响应（最多保存 4000 字符）',
   `triggered_by` BIGINT NOT NULL COMMENT '触发管理员',
   `adopted_by` BIGINT NULL COMMENT '采纳建议的管理员',
   `adopted_at` DATETIME NULL COMMENT '采纳时间',

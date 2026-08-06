@@ -16,6 +16,7 @@
         <result property="resultJson" column="result_json"/>
         <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
+        <result property="rawResponse" column="raw_response"/>
         <result property="triggeredBy" column="triggered_by"/>
         <result property="adoptedBy" column="adopted_by"/>
         <result property="adoptedAt" column="adopted_at"/>
@@ -70,7 +71,7 @@
     <update id="markFailure">
         UPDATE dispute_agent_run
         SET status = #{status}, error_code = #{errorCode}, error_message = #{errorMessage},
-            finished_at = CURRENT_TIMESTAMP
+            raw_response = #{rawResponse}, finished_at = CURRENT_TIMESTAMP
         WHERE run_id = #{runId} AND status IN ('PENDING', 'RUNNING')
     </update>
 

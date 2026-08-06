@@ -141,7 +141,7 @@ class DisputeAgentRunServiceTest {
         when(snapshotBuilder.factFields(any())).thenReturn(java.util.Map.of());
         when(modelService.analyze(any(), any())).thenThrow(new DisputeAgentOutputInvalidException("bad json"));
         service().execute(run);
-        verify(persistenceService).fail(run, DisputeAgentStatus.INVALID_OUTPUT, "AI_OUTPUT_INVALID", "bad json");
+        verify(persistenceService).fail(run, DisputeAgentStatus.INVALID_OUTPUT, "AI_OUTPUT_INVALID", "bad json", null);
     }
 
     @Test

@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -53,6 +52,7 @@ public class DisputeAgentModelService {
         this.failureClassifier = failureClassifier;
     }
 
+    /** 调用模型并返回通过白名单和原文校验的建议。 */
     /**
      * 调用模型并返回通过白名单和原文校验的建议。
      *
@@ -114,14 +114,35 @@ public class DisputeAgentModelService {
         try {
             ObjectMapper strictMapper = objectMapper.copy()
                     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-            DisputeAgentResult result = strictMapper.readValue(rawResponse, DisputeAgentResult.class);
+            String normalizedResponse = stripMarkdownCodeBlock(rawResponse);
+            DisputeAgentResult result = strictMapper.readValue(
+                    normalizedResponse,
+                    DisputeAgentResult.class
+            );
             validator.validate(result, allowedRuleRefs, factFields);
             return result;
         } catch (DisputeAgentOutputInvalidException exception) {
-            throw exception;
+            throw new DisputeAgentOutputInvalidException(
+                    exception.getMessage(), exception, rawResponse
+            );
         } catch (Exception exception) {
-            throw new DisputeAgentOutputInvalidException("结构化输出解析或校验失败", exception);
+            throw new DisputeAgentOutputInvalidException(
+                    "结构化输出解析或校验失败: " + exception.getMessage(),
+                    exception,
+                    rawResponse
+            );
         }
+    }
+
+    private String stripMarkdownCodeBlock(String rawResponse) {
+        String trimmed = rawResponse.trim();
+        if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
+            int firstLineEnd = trimmed.indexOf('\n');
+            if (firstLineEnd >= 0) {
+                return trimmed.substring(firstLineEnd + 1, trimmed.length() - 3).trim();
+            }
+        }
+        return trimmed;
     }
 
     private Map<String, Object> snapshotToMap(DisputeAgentInputSnapshot snapshot) {

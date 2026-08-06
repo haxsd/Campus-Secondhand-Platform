@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class DisputeAgentPersistenceService {
+    private static final int RAW_RESPONSE_LIMIT = 4000;
+
     private final DisputeAgentRunMapper runMapper;
     private final ObjectMapper objectMapper;
 
@@ -26,7 +28,7 @@ public class DisputeAgentPersistenceService {
         try {
             return runMapper.markSuccess(run.getRunId(), objectMapper.writeValueAsString(result)) > 0;
         } catch (JsonProcessingException exception) {
-            fail(run, DisputeAgentStatus.FAILED, "RESULT_SERIALIZE_FAILED", exception.getMessage());
+            fail(run, DisputeAgentStatus.FAILED, "RESULT_SERIALIZE_FAILED", exception.getMessage(), null);
             return false;
         }
     }
@@ -34,13 +36,31 @@ public class DisputeAgentPersistenceService {
     /** 持久化输出非法、网络失败等终态。 */
     @Transactional
     public void fail(DisputeAgentRunEntity run, DisputeAgentStatus status, String code, String message) {
-        runMapper.markFailure(run.getRunId(), status.name(), code, limit(message));
+        fail(run, status, code, message, null);
+    }
+
+    /** 持久化终态及截断后的模型原文，避免错误信息丢失诊断上下文。 */
+    @Transactional
+    public void fail(
+            DisputeAgentRunEntity run,
+            DisputeAgentStatus status,
+            String code,
+            String message,
+            String rawResponse
+    ) {
+        runMapper.markFailure(
+                run.getRunId(),
+                status.name(),
+                code,
+                limit(message, 500),
+                limit(rawResponse, RAW_RESPONSE_LIMIT)
+        );
     }
 
     /** 超时是独立终态，不能伪装成普通失败或输出非法。 */
     @Transactional
     public void timeout(DisputeAgentRunEntity run) {
-        fail(run, DisputeAgentStatus.TIMEOUT, "AI_TIMEOUT", "模型调用超过允许时长");
+        fail(run, DisputeAgentStatus.TIMEOUT, "AI_TIMEOUT", "模型调用超过允许时长", null);
     }
 
     /** 证据版本或纠纷状态变化后，使运行结果失效。 */
@@ -49,8 +69,10 @@ public class DisputeAgentPersistenceService {
         runMapper.markStale(run.getRunId(), "VERSION_OR_STATUS_CHANGED");
     }
 
-    private String limit(String message) {
-        if (message == null) return null;
-        return message.length() <= 500 ? message : message.substring(0, 500);
+    private String limit(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }

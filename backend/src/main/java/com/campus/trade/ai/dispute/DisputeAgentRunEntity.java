@@ -22,6 +22,7 @@ public class DisputeAgentRunEntity {
     private String resultJson;
     private String errorCode;
     private String errorMessage;
+    private String rawResponse;
     private Long triggeredBy;
     private Long adoptedBy;
     private LocalDateTime adoptedAt;
@@ -59,6 +60,8 @@ public class DisputeAgentRunEntity {
     public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+    public String getRawResponse() { return rawResponse; }
+    public void setRawResponse(String rawResponse) { this.rawResponse = rawResponse; }
     public Long getTriggeredBy() { return triggeredBy; }
     public void setTriggeredBy(Long triggeredBy) { this.triggeredBy = triggeredBy; }
     public Long getAdoptedBy() { return adoptedBy; }
