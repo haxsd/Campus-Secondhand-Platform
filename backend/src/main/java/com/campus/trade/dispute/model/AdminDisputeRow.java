@@ -2,50 +2,22 @@ package com.campus.trade.dispute.model;
 
 import java.time.LocalDateTime;
 
-/**
- * 管理端纠纷列表的一行数据库读模型。
- *
- * <p>该对象由一条 JOIN SQL 直接映射，避免 Service 对每条纠纷分别查询订单、商品和两名用户。
- * evidenceJson 保持为数据库 JSON 文本，Service 在返回接口前再统一转换为字符串列表，
- * 从而保持既有 API 响应结构不变。</p>
- */
 public class AdminDisputeRow {
-
-    private Long id;
-    private Long orderId;
-    private Integer reasonType;
-    private String statement;
-    private String evidenceJson;
-    private Integer status;
-    private String orderNo;
-    private String productTitle;
-    private String buyerName;
-    private String sellerName;
-    private Integer orderStatus;
-    private LocalDateTime createdAt;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getOrderId() { return orderId; }
-    public void setOrderId(Long orderId) { this.orderId = orderId; }
-    public Integer getReasonType() { return reasonType; }
-    public void setReasonType(Integer reasonType) { this.reasonType = reasonType; }
-    public String getStatement() { return statement; }
-    public void setStatement(String statement) { this.statement = statement; }
-    public String getEvidenceJson() { return evidenceJson; }
-    public void setEvidenceJson(String evidenceJson) { this.evidenceJson = evidenceJson; }
-    public Integer getStatus() { return status; }
-    public void setStatus(Integer status) { this.status = status; }
-    public String getOrderNo() { return orderNo; }
-    public void setOrderNo(String orderNo) { this.orderNo = orderNo; }
-    public String getProductTitle() { return productTitle; }
-    public void setProductTitle(String productTitle) { this.productTitle = productTitle; }
-    public String getBuyerName() { return buyerName; }
-    public void setBuyerName(String buyerName) { this.buyerName = buyerName; }
-    public String getSellerName() { return sellerName; }
-    public void setSellerName(String sellerName) { this.sellerName = sellerName; }
-    public Integer getOrderStatus() { return orderStatus; }
-    public void setOrderStatus(Integer orderStatus) { this.orderStatus = orderStatus; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    private Long id; private Long orderId; private Integer reasonType; private String statement;
+    private String evidenceJson; private Integer status; private Integer evidenceVersion;
+    private String orderNo; private String productTitle; private String buyerName; private String sellerName;
+    private Integer orderStatus; private LocalDateTime createdAt;
+    public Long getId() { return id; } public void setId(Long v) { id=v; }
+    public Long getOrderId() { return orderId; } public void setOrderId(Long v) { orderId=v; }
+    public Integer getReasonType() { return reasonType; } public void setReasonType(Integer v) { reasonType=v; }
+    public String getStatement() { return statement; } public void setStatement(String v) { statement=v; }
+    public String getEvidenceJson() { return evidenceJson; } public void setEvidenceJson(String v) { evidenceJson=v; }
+    public Integer getStatus() { return status; } public void setStatus(Integer v) { status=v; }
+    public Integer getEvidenceVersion() { return evidenceVersion; } public void setEvidenceVersion(Integer v) { evidenceVersion=v; }
+    public String getOrderNo() { return orderNo; } public void setOrderNo(String v) { orderNo=v; }
+    public String getProductTitle() { return productTitle; } public void setProductTitle(String v) { productTitle=v; }
+    public String getBuyerName() { return buyerName; } public void setBuyerName(String v) { buyerName=v; }
+    public String getSellerName() { return sellerName; } public void setSellerName(String v) { sellerName=v; }
+    public Integer getOrderStatus() { return orderStatus; } public void setOrderStatus(Integer v) { orderStatus=v; }
+    public LocalDateTime getCreatedAt() { return createdAt; } public void setCreatedAt(LocalDateTime v) { createdAt=v; }
 }

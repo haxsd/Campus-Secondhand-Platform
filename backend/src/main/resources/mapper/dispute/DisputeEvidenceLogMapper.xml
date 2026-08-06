@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.dispute.mapper.DisputeEvidenceLogMapper">
+    <insert id="insert" parameterType="com.campus.trade.dispute.entity.DisputeEvidenceLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO dispute_evidence_log (dispute_id, operator_id, operator_role, evidence_version, statement, evidence)
+        VALUES (#{disputeId}, #{operatorId}, #{operatorRole}, #{evidenceVersion}, #{statement}, CAST(#{evidenceJson} AS JSON))
+    </insert>
+    <select id="selectByDisputeId" resultType="com.campus.trade.dispute.entity.DisputeEvidenceLog">
+        SELECT id, dispute_id, operator_id, operator_role, evidence_version, statement,
+               evidence AS evidence_json, created_at
+        FROM dispute_evidence_log
+        WHERE dispute_id = #{disputeId}
+        ORDER BY evidence_version ASC, id ASC
+    </select>
+</mapper>
