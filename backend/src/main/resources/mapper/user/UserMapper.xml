@@ -128,4 +128,13 @@
         SET password = #{password}
         WHERE id = #{userId}
     </update>
+
+    <!-- 管理员详情读取信用摘要读模型，避免为每个纠纷现场扫描评价表。 -->
+    <select id="selectCreditSummary" resultType="com.campus.trade.user.entity.CreditSummary">
+        SELECT user_id, credit_score, deal_count, review_count, avg_rating,
+               good_review_rate, bad_review_count
+        FROM user_credit_summary
+        WHERE user_id = #{userId}
+        LIMIT 1
+    </select>
 </mapper>

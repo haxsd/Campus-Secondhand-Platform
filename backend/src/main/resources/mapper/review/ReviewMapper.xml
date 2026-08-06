@@ -62,4 +62,12 @@
             cs.version          = cs.version + 1
         WHERE cs.user_id = #{sellerId}
     </update>
+
+    <!-- 纠纷详情按订单读取评价；order_id 唯一，因此 LIMIT 1 表达一对一关系。 -->
+    <select id="selectByOrderId" resultType="com.campus.trade.review.entity.TradeReview">
+        SELECT id, order_id, reviewer_id, seller_id, rating, content, tags, visible, created_at
+        FROM trade_review
+        WHERE order_id = #{orderId}
+        LIMIT 1
+    </select>
 </mapper>

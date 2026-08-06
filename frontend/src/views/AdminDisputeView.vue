@@ -3,7 +3,7 @@
 // 四种处理动作对应订单不同走向：驳回(恢复原状态)/维持完成/取消交易(可退货回补库存)/待补材料。
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getDisputes, handleDispute } from '@/api/admin'
+import { getDisputeDetail, getDisputes, handleDispute } from '@/api/admin'
 import { DISPUTE_STATUS, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 
 const list = ref([])
@@ -82,10 +82,13 @@ function nextPage() {
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const current = ref(null) // 当前处理的纠纷行
+const detail = ref(null)
 const form = reactive({ action: 'REJECT', restock: true, note: '' })
 
 function openHandle(row) {
   current.value = row
+  detail.value = null
+  getDisputeDetail(row.id).then((value) => { detail.value = value }).catch(() => {})
   form.action = 'REJECT'
   form.restock = true
   form.note = ''
@@ -96,7 +99,7 @@ async function submitHandle() {
   submitting.value = true
   try {
     // 只有"取消交易"才需要 restock 字段，其它动作不传
-    const payload = { action: form.action, note: form.note }
+    const payload = { action: form.action, note: form.note, evidenceVersion: detail.value?.evidenceVersion ?? current.value.evidenceVersion }
     if (form.action === 'CANCEL_TRADE') payload.restock = form.restock
     await handleDispute(current.value.id, payload)
     ElMessage.success('处理成功')
@@ -168,6 +171,35 @@ onMounted(loadList)
       </template>
     </el-table>
 
+
+    <el-card v-if="detail" shadow="never" class="block">
+      <template #header>纠纷详情（证据版本 {{ detail.evidenceVersion }}）</template>
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="下单时商品快照">{{ detail.snapshot?.title }}（非当前商品）</el-descriptions-item>
+        <el-descriptions-item label="快照描述">{{ detail.snapshot?.description }}</el-descriptions-item>
+        <el-descriptions-item label="下单价格">{{ detail.snapshot?.price }}</el-descriptions-item>
+        <el-descriptions-item label="下单成色">{{ detail.snapshot?.itemCondition }}</el-descriptions-item>
+        <el-descriptions-item label="买家信用">{{ detail.applicantCredit?.creditScore }} 分，差评 {{ detail.applicantCredit?.badReviewCount }} 条</el-descriptions-item>
+        <el-descriptions-item label="卖家信用">{{ detail.respondentCredit?.creditScore }} 分，差评 {{ detail.respondentCredit?.badReviewCount }} 条</el-descriptions-item>
+        <el-descriptions-item label="订单评价">{{ detail.review?.content || '暂无评价' }}</el-descriptions-item>
+      </el-descriptions>
+      <div class="detail-section">
+        <strong>订单状态时间线</strong>
+        <el-timeline>
+          <el-timeline-item v-for="item in detail.orderLogs || []" :key="item.id" :timestamp="item.createdAt">
+            {{ item.fromStatus }} → {{ item.toStatus }}：{{ item.reason }}
+          </el-timeline-item>
+        </el-timeline>
+      </div>
+      <div class="detail-section">
+        <strong>证据追加流水</strong>
+        <el-timeline>
+          <el-timeline-item v-for="item in detail.evidenceLogs || []" :key="item.id" :timestamp="item.createdAt">
+            版本 {{ item.evidenceVersion }}，{{ item.operatorRole === 0 ? '申请人' : '被申请人' }}：{{ item.statement || '仅追加图片' }}
+          </el-timeline-item>
+        </el-timeline>
+      </div>
+    </el-card>
     <div v-if="cursorIndex > 0 || hasNext" class="pager">
       <el-button :disabled="loading || cursorIndex === 0" @click="previousPage">上一页</el-button>
       <span class="page-indicator">第 {{ cursorIndex + 1 }} 页</span>

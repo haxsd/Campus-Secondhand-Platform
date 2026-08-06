@@ -21,6 +21,7 @@ public record AdminDisputeVO(
         String statement,
         List<String> evidence,
         Integer status,
+        Integer evidenceVersion,
         String orderNo,
         String productTitle,
         String buyerName,

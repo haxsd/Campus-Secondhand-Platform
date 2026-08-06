@@ -7,15 +7,17 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getOrderDetail, confirmOrder, cancelOrder, completeOrder } from '@/api/order'
 import { createReview } from '@/api/review'
-import { createDispute } from '@/api/dispute'
+import { createDispute, getDisputeByOrder } from '@/api/dispute'
 import { ORDER_STATUS, ITEM_CONDITION, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 import OrderStatusTag from '@/components/OrderStatusTag.vue'
 import ImageUploader from '@/components/ImageUploader.vue'
+import DisputeParticipantPanel from '@/components/DisputeParticipantPanel.vue'
 
 const route = useRoute()
 const orderId = route.params.id
 
 const order = ref(null)
+const dispute = ref(null)
 const loading = ref(false)
 const notFound = ref(false)
 const acting = ref(false) // 操作按钮的加载态，防止连点
@@ -27,6 +29,12 @@ async function loadDetail() {
   loading.value = true
   try {
     order.value = await getOrderDetail(orderId)
+    dispute.value = null
+    try {
+      dispute.value = await getDisputeByOrder(orderId)
+    } catch (e) {
+      if (e?.code !== 404) throw e
+    }
     notFound.value = false
   } catch {
     // 订单不存在的提示已由请求层弹出，这里标记成空态
@@ -201,6 +209,12 @@ onMounted(loadDetail)
             <OrderStatusTag :status="order.status" />
           </div>
         </el-card>
+
+        <DisputeParticipantPanel
+          v-if="dispute"
+          :dispute="dispute"
+          @updated="dispute = $event"
+        />
 
         <!-- 商品快照 -->
         <el-card shadow="never" class="block">

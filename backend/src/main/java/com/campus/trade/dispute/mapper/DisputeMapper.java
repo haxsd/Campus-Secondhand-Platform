@@ -48,6 +48,17 @@ public interface DisputeMapper {
             @Param("id") Long id,
             @Param("targetStatus") Integer targetStatus,
             @Param("handlerId") Long handlerId,
-            @Param("note") String note
+            @Param("note") String note,
+            @Param("evidenceVersion") Integer evidenceVersion
+    );
+
+    /** 按订单读取纠纷，供买卖双方从订单详情进入自己的纠纷。 */
+    Optional<Dispute> selectByOrderId(@Param("orderId") Long orderId);
+
+    /** 仅在 status=1 且版本匹配时追加证据并回到待处理。 */
+    int appendEvidence(
+            @Param("id") Long id,
+            @Param("evidenceVersion") Integer evidenceVersion,
+            @Param("evidenceJson") String evidenceJson
     );
 }

@@ -11,6 +11,7 @@
         reason_type,
         statement,
         evidence evidence_json,
+        evidence_version,
         status,
         handler_id,
         handle_note,
@@ -42,6 +43,7 @@
                              reason_type,
                              statement,
                              evidence,
+                             evidence_version,
                              status)
         VALUES (#{orderId},
                 #{applicantId},
@@ -49,6 +51,7 @@
                 #{reasonType},
                 #{statement},
                 CAST(#{evidenceJson} AS JSON),
+                1,
                 #{status})
     </insert>
 
@@ -64,6 +67,7 @@
                d.statement,
                d.evidence AS evidence_json,
                d.status,
+               d.evidence_version,
                d.created_at,
                o.order_no,
                o.status AS order_status,
@@ -106,5 +110,17 @@
             handled_at = CASE WHEN #{targetStatus} = 1 THEN NULL ELSE CURRENT_TIMESTAMP END
         WHERE id = #{id}
           AND status IN (0, 1)
+          AND evidence_version = #{evidenceVersion}
+    </update>
+
+    <!-- 只有待补材料且版本一致时才允许追加，影响行数 0 表示并发冲突。 -->
+    <update id="appendEvidence">
+        UPDATE dispute
+        SET evidence = CAST(#{evidenceJson} AS JSON),
+            status = 0,
+            evidence_version = evidence_version + 1
+        WHERE id = #{id}
+          AND status = 1
+          AND evidence_version = #{evidenceVersion}
     </update>
 </mapper>

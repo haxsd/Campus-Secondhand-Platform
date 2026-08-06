@@ -37,6 +37,9 @@ public class Dispute {
     /** 证据图片地址列表，以 JSON 数组字符串存储。 */
     private String evidenceJson;
 
+    /** 当前证据版本，每次追加材料成功后递增。 */
+    private Integer evidenceVersion;
+
     /** 管理员的处理备注。 */
     private String handleNote;
 
@@ -117,6 +120,14 @@ public class Dispute {
 
     public void setEvidenceJson(String evidenceJson) {
         this.evidenceJson = evidenceJson;
+    }
+
+    public Integer getEvidenceVersion() {
+        return evidenceVersion;
+    }
+
+    public void setEvidenceVersion(Integer evidenceVersion) {
+        this.evidenceVersion = evidenceVersion;
     }
 
     public String getHandleNote() {

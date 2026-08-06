@@ -41,3 +41,8 @@ export function handleDispute(id, data) {
   if (useMock) return mockHandleDispute(id, data)
   return post(`/admin/disputes/${id}/handle`, data)
 }
+
+// GET /api/admin/disputes/{id} —— 管理员读取纠纷聚合详情
+export function getDisputeDetail(id) {
+  return get(`/admin/disputes/${id}`)
+}

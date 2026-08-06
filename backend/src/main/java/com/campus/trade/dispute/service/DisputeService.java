@@ -4,20 +4,30 @@ import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.common.exception.ErrorCode;
 import com.campus.trade.common.response.CursorPageResult;
+import com.campus.trade.dispute.dto.AppendDisputeEvidenceRequest;
 import com.campus.trade.dispute.dto.CreateDisputeRequest;
 import com.campus.trade.dispute.dto.HandleDisputeRequest;
 import com.campus.trade.dispute.entity.Dispute;
+import com.campus.trade.dispute.entity.DisputeEvidenceLog;
+import com.campus.trade.dispute.mapper.DisputeEvidenceLogMapper;
 import com.campus.trade.dispute.mapper.DisputeMapper;
 import com.campus.trade.dispute.model.DisputeRules;
 import com.campus.trade.dispute.model.AdminDisputeRow;
 import com.campus.trade.dispute.vo.AdminDisputeVO;
 import com.campus.trade.dispute.vo.DisputeCreatedVO;
+import com.campus.trade.dispute.vo.DisputeDetailVO;
+import com.campus.trade.dispute.vo.ParticipantDisputeDetailVO;
+import com.campus.trade.order.entity.ProductSnapshot;
 import com.campus.trade.order.entity.TradeOrder;
 import com.campus.trade.order.entity.TradeOrderLog;
 import com.campus.trade.order.mapper.OrderMapper;
 import com.campus.trade.order.model.OrderStatus;
 import com.campus.trade.product.mapper.ProductMapper;
 import com.campus.trade.product.service.SellerDetailCacheInvalidator;
+import com.campus.trade.review.entity.TradeReview;
+import com.campus.trade.review.mapper.ReviewMapper;
+import com.campus.trade.user.entity.CreditSummary;
+import com.campus.trade.user.entity.User;
 import com.campus.trade.user.mapper.UserMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -54,25 +65,29 @@ public class DisputeService {
     private static final int OPERATOR_SELLER = 1;
     private static final int OPERATOR_ADMIN = 3;
 
+    /** 单次追加最多 5 张，避免一次请求过大；历史累计最多 15 张，给当事人保留多轮补充空间。 */
+    private static final int MAX_EVIDENCE_PER_APPEND = 5;
+    private static final int MAX_EVIDENCE_TOTAL = 15;
+
     private final DisputeMapper disputes;
+    private final DisputeEvidenceLogMapper evidenceLogs;
     private final OrderMapper orders;
     private final ProductMapper products;
     private final UserMapper users;
+    private final ReviewMapper reviews;
     private final SellerDetailCacheInvalidator cacheInvalidator;
     private final ObjectMapper json;
 
-    public DisputeService(
-            DisputeMapper disputes,
-            OrderMapper orders,
-            ProductMapper products,
-            UserMapper users,
-            SellerDetailCacheInvalidator cacheInvalidator,
-            ObjectMapper json
-    ) {
+    /** 详情查询、证据流水和管理员聚合都依赖完整的数据访问对象；单构造器由 Spring 自动注入。 */
+    public DisputeService(DisputeMapper disputes, DisputeEvidenceLogMapper evidenceLogs, OrderMapper orders,
+                          ProductMapper products, UserMapper users, ReviewMapper reviews,
+                          SellerDetailCacheInvalidator cacheInvalidator, ObjectMapper json) {
         this.disputes = disputes;
+        this.evidenceLogs = evidenceLogs;
         this.orders = orders;
         this.products = products;
         this.users = users;
+        this.reviews = reviews;
         this.cacheInvalidator = cacheInvalidator;
         this.json = json;
     }
@@ -115,6 +130,7 @@ public class DisputeService {
         dispute.setStatement(request.statement().trim());
         dispute.setEvidenceJson(writeEvidence(request.evidence()));
         dispute.setStatus(DISPUTE_PENDING);
+        dispute.setEvidenceVersion(1);
 
         try {
             disputes.insert(dispute);
@@ -176,13 +192,13 @@ public class DisputeService {
         switch (request.action()) {
             // 要求当事人补充材料：只推进纠纷状态，订单继续冻结，因此这里直接返回。
             case "NEED_MORE" -> {
-                updateDisputeStatus(dispute, DISPUTE_NEED_MORE, adminId, note);
+                updateDisputeStatus(dispute, DISPUTE_NEED_MORE, adminId, note, request.evidenceVersion());
                 return;
             }
 
             // 驳回纠纷：订单回到进入纠纷之前的状态。
             case "REJECT" -> {
-                updateDisputeStatus(dispute, DISPUTE_REJECTED, adminId, note);
+                updateDisputeStatus(dispute, DISPUTE_REJECTED, adminId, note, request.evidenceVersion());
                 int statusBeforeDispute = order.getStatusBeforeDispute();
                 if (orders.restoreFromDispute(order.getId(), statusBeforeDispute) == 0) {
                     throw conflict("订单状态已变化");
@@ -199,7 +215,7 @@ public class DisputeService {
 
             // 维持交易完成：订单判定为已完成。
             case "KEEP_COMPLETED" -> {
-                updateDisputeStatus(dispute, DISPUTE_KEEP_COMPLETED, adminId, note);
+                updateDisputeStatus(dispute, DISPUTE_KEEP_COMPLETED, adminId, note, request.evidenceVersion());
                 if (orders.completeFromDispute(order.getId()) == 0) {
                     throw conflict("订单状态已变化");
                 }
@@ -222,7 +238,7 @@ public class DisputeService {
 
             // 取消交易：订单判定为已取消，是否退货回补库存由管理员勾选。
             case "CANCEL_TRADE" -> {
-                updateDisputeStatus(dispute, DISPUTE_CANCEL_TRADE, adminId, note);
+                updateDisputeStatus(dispute, DISPUTE_CANCEL_TRADE, adminId, note, request.evidenceVersion());
                 if (orders.cancelFromDispute(order.getId()) == 0) {
                     throw conflict("订单状态已变化");
                 }
@@ -291,6 +307,7 @@ public class DisputeService {
                 dispute.getStatement(),
                 readEvidence(dispute.getEvidenceJson()),
                 dispute.getStatus(),
+                dispute.getEvidenceVersion(),
                 nullToEmpty(dispute.getOrderNo()),
                 nullToEmpty(dispute.getProductTitle()),
                 nullToEmpty(dispute.getBuyerName()),
@@ -301,8 +318,8 @@ public class DisputeService {
     }
 
     /** 条件更新纠纷状态：只有仍处于待处理/待补材料的纠纷才能被裁决，避免两名管理员重复处理。 */
-    private void updateDisputeStatus(Dispute dispute, int targetStatus, Long adminId, String note) {
-        if (disputes.updateHandled(dispute.getId(), targetStatus, adminId, note) == 0) {
+    private void updateDisputeStatus(Dispute dispute, int targetStatus, Long adminId, String note, Integer evidenceVersion) {
+        if (disputes.updateHandled(dispute.getId(), targetStatus, adminId, note, evidenceVersion) == 0) {
             throw conflict("该纠纷已处理");
         }
     }
@@ -349,5 +366,140 @@ public class DisputeService {
 
     private BizException conflict(String message) {
         return new BizException(ErrorCode.CONFLICT, message);
+    }
+
+    /** 只有申请人和被申请人可以查看纠纷详情，管理员走独立的管理端接口。 */
+    public ParticipantDisputeDetailVO getForParticipant(Long disputeId) {
+        Long userId = UserContext.requireCurrentUser().userId();
+        Dispute dispute = findDispute(disputeId);
+        if (participantRole(dispute, userId) < 0) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有纠纷当事人可以查看");
+        }
+        return buildParticipantDetail(dispute);
+    }
+
+    /** 订单详情页按订单查询纠纷，仍然复用当事人权限校验。 */
+    public ParticipantDisputeDetailVO getForOrder(Long orderId) {
+        Long userId = UserContext.requireCurrentUser().userId();
+        Dispute dispute = disputes.selectByOrderId(orderId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "纠纷不存在"));
+        if (participantRole(dispute, userId) < 0) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有纠纷当事人可以查看");
+        }
+        return buildParticipantDetail(dispute);
+    }
+
+    /**
+     * 补充材料采用“读旧版本 + 条件更新 + 写流水”的顺序。
+     * 条件更新影响行数为 0 时，说明管理员或另一方已经更新了这份纠纷，不能继续写流水。
+     */
+    @Transactional
+    public void appendEvidence(Long disputeId, AppendDisputeEvidenceRequest request) {
+        Long userId = UserContext.requireCurrentUser().userId();
+        Dispute dispute = findDispute(disputeId);
+        int role = participantRole(dispute, userId);
+        if (role < 0) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有纠纷当事人可以补充材料");
+        }
+        if (!Objects.equals(dispute.getStatus(), DISPUTE_NEED_MORE)) {
+            throw conflict("当前纠纷不是待补充材料状态");
+        }
+        List<String> additions = request.evidence() == null ? List.of() : request.evidence();
+        if (additions.size() > MAX_EVIDENCE_PER_APPEND) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "单次追加证据图片最多 5 张");
+        }
+        String statement = request.statement() == null ? null : request.statement().trim();
+        if ((statement == null || statement.isBlank()) && additions.isEmpty()) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "补充说明和证据不能同时为空");
+        }
+        List<String> merged = new ArrayList<>(readEvidence(dispute.getEvidenceJson()));
+        merged.addAll(additions);
+        if (merged.size() > MAX_EVIDENCE_TOTAL) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "累计证据图片最多保留 15 张");
+        }
+        int oldVersion = dispute.getEvidenceVersion() == null ? 1 : dispute.getEvidenceVersion();
+        if (disputes.appendEvidence(disputeId, oldVersion, writeEvidence(merged)) == 0) {
+            throw conflict("纠纷材料已被更新，请刷新后重试");
+        }
+        DisputeEvidenceLog log = new DisputeEvidenceLog();
+        log.setDisputeId(disputeId);
+        log.setOperatorId(userId);
+        log.setOperatorRole(role);
+        log.setEvidenceVersion(oldVersion + 1);
+        log.setStatement(statement);
+        log.setEvidenceJson(writeEvidence(additions));
+        evidenceLogs.insert(log);
+    }
+
+    /**
+     * 当事人只能看到处理纠纷所需的信息；信用摘要、评价、订单日志和 handler_id 属于管理端风控数据。
+     */
+    private ParticipantDisputeDetailVO buildParticipantDetail(Dispute dispute) {
+        TradeOrder order = orders.selectById(dispute.getOrderId()).orElse(null);
+        User applicant = users.selectById(dispute.getApplicantId()).orElse(null);
+        User respondent = users.selectById(dispute.getRespondentId()).orElse(null);
+        ProductSnapshot snapshot = order == null ? null : orders.selectSnapshotByOrderId(order.getId()).orElse(null);
+        List<ParticipantDisputeDetailVO.EvidenceLogVO> logs = evidenceLogs.selectByDisputeId(dispute.getId()).stream()
+                .map(log -> new ParticipantDisputeDetailVO.EvidenceLogVO(log.getId(), log.getOperatorId(),
+                        log.getOperatorRole(), log.getEvidenceVersion(), log.getStatement(),
+                        readEvidence(log.getEvidenceJson()), log.getCreatedAt()))
+                .toList();
+        ParticipantDisputeDetailVO.OrderSummary orderSummary = order == null ? null
+                : new ParticipantDisputeDetailVO.OrderSummary(order.getId(), order.getOrderNo(),
+                order.getQuantity(), order.getUnitPrice(), order.getTotalAmount(), order.getStatus(),
+                order.getTradeTime(), order.getFinishedAt());
+        return new ParticipantDisputeDetailVO(dispute.getId(), dispute.getOrderId(), dispute.getApplicantId(),
+                dispute.getRespondentId(), dispute.getReasonType(), dispute.getStatement(),
+                readEvidence(dispute.getEvidenceJson()), dispute.getStatus(), dispute.getEvidenceVersion(),
+                dispute.getHandleNote(), dispute.getHandledAt(), dispute.getCreatedAt(), orderSummary, snapshot,
+                participant(applicant), participant(respondent), logs);
+    }
+
+    /** 管理员详情固定聚合一条纠纷的关联数据，不按列表逐行查询。 */
+    public DisputeDetailVO adminDetail(Long disputeId) {
+        return buildDetail(findDispute(disputeId));
+    }
+
+    private DisputeDetailVO buildDetail(Dispute dispute) {
+        TradeOrder order = orders.selectById(dispute.getOrderId()).orElse(null);
+        User applicant = users.selectById(dispute.getApplicantId()).orElse(null);
+        User respondent = users.selectById(dispute.getRespondentId()).orElse(null);
+        ProductSnapshot snapshot = order == null ? null : orders.selectSnapshotByOrderId(order.getId()).orElse(null);
+        TradeReview review = order == null ? null : reviews.selectByOrderId(order.getId());
+        CreditSummary applicantCredit = users.selectCreditSummary(dispute.getApplicantId()).orElse(null);
+        CreditSummary respondentCredit = users.selectCreditSummary(dispute.getRespondentId()).orElse(null);
+        List<TradeOrderLog> logs = order == null ? List.of() : orders.selectLogsByOrderId(order.getId());
+        List<DisputeDetailVO.EvidenceLogVO> evidenceLogs = this.evidenceLogs.selectByDisputeId(dispute.getId()).stream()
+                .map(log -> new DisputeDetailVO.EvidenceLogVO(log.getId(), log.getOperatorId(), log.getOperatorRole(),
+                        log.getEvidenceVersion(), log.getStatement(), readEvidence(log.getEvidenceJson()), log.getCreatedAt()))
+                .toList();
+        DisputeDetailVO.OrderSummary orderSummary = order == null ? null : new DisputeDetailVO.OrderSummary(
+                order.getId(), order.getOrderNo(), order.getBuyerId(), order.getSellerId(), order.getProductId(),
+                order.getQuantity(), order.getUnitPrice(), order.getTotalAmount(), order.getStatus(),
+                order.getStatusBeforeDispute(), order.getRemark(), order.getTradeTime(), order.getFinishedAt());
+        return new DisputeDetailVO(dispute.getId(), dispute.getOrderId(), dispute.getApplicantId(), dispute.getRespondentId(),
+                dispute.getReasonType(), dispute.getStatement(), readEvidence(dispute.getEvidenceJson()), dispute.getStatus(),
+                dispute.getEvidenceVersion(), dispute.getHandlerId(), dispute.getHandleNote(), dispute.getHandledAt(),
+                dispute.getCreatedAt(), orderSummary, snapshot, participantAdmin(applicant), participantAdmin(respondent),
+                applicantCredit, respondentCredit, review, logs, evidenceLogs);
+    }
+
+    private ParticipantDisputeDetailVO.Participant participant(User user) {
+        return user == null ? null : new ParticipantDisputeDetailVO.Participant(user.getId(), user.getNickname(), user.getAvatar(), user.getCampus());
+    }
+
+    private DisputeDetailVO.Participant participantAdmin(User user) {
+        return user == null ? null : new DisputeDetailVO.Participant(user.getId(), user.getNickname(), user.getAvatar(), user.getCampus());
+    }
+
+    private int participantRole(Dispute dispute, Long userId) {
+        if (Objects.equals(dispute.getApplicantId(), userId)) return 0;
+        if (Objects.equals(dispute.getRespondentId(), userId)) return 1;
+        return -1;
+    }
+
+    private Dispute findDispute(Long disputeId) {
+        return disputes.selectById(disputeId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "纠纷不存在"));
     }
 }

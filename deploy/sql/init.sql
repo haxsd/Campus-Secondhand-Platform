@@ -225,6 +225,7 @@ CREATE TABLE `dispute` (
   `reason_type`   TINYINT       NOT NULL COMMENT '纠纷原因分类 0货不对板 1未履约 2其他',
   `statement`     VARCHAR(2000) NOT NULL COMMENT '申请人文字说明（当事人主张）',
   `evidence`      JSON          DEFAULT NULL COMMENT '证据材料地址列表',
+  `evidence_version` INT        NOT NULL DEFAULT 1 COMMENT '当前证据版本',
   `status`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0待处理 1待补材料 2驳回 3维持完成 4取消交易',
   `handler_id`    BIGINT        DEFAULT NULL COMMENT '处理管理员',
   `handle_note`   VARCHAR(1000) DEFAULT NULL COMMENT '处理说明',
@@ -238,6 +239,21 @@ CREATE TABLE `dispute` (
 ) ENGINE=InnoDB COMMENT='纠纷表';
 
 -- ---------------------------------------------------------------------
+-- 纠纷证据追加流水：每次补充都保留操作者、版本、说明和本次新增图片，历史证据不可覆盖。
+CREATE TABLE `dispute_evidence_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `dispute_id` BIGINT NOT NULL COMMENT '关联纠纷',
+  `operator_id` BIGINT NOT NULL COMMENT '追加材料的用户',
+  `operator_role` TINYINT NOT NULL COMMENT '0申请人 1被申请人',
+  `evidence_version` INT NOT NULL COMMENT '本次追加后的版本',
+  `statement` VARCHAR(2000) DEFAULT NULL COMMENT '本次补充说明',
+  `evidence` JSON DEFAULT NULL COMMENT '本次追加的证据地址列表',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_dispute_created` (`dispute_id`, `created_at`, `id`),
+  KEY `idx_dispute_version` (`dispute_id`, `evidence_version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='纠纷证据追加流水';
+
 -- 5. 初始数据
 -- ---------------------------------------------------------------------
 

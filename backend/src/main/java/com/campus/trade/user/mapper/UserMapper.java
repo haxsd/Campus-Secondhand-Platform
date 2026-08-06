@@ -1,5 +1,6 @@
 package com.campus.trade.user.mapper;
 
+import com.campus.trade.user.entity.CreditSummary;
 import com.campus.trade.user.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -75,4 +76,7 @@ public interface UserMapper {
      * @return 受影响行数，正常应为 1
      */
     int updatePassword(@Param("userId") Long userId, @Param("password") String password);
+
+    /** 查询用户信用摘要，详情页只读该聚合表，不现场扫描评价。 */
+    Optional<CreditSummary> selectCreditSummary(@Param("userId") Long userId);
 }

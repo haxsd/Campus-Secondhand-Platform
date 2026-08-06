@@ -4,6 +4,7 @@ import com.campus.trade.common.context.CurrentUser;
 import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.dispute.dto.CreateDisputeRequest;
+import com.campus.trade.dispute.mapper.DisputeEvidenceLogMapper;
 import com.campus.trade.dispute.mapper.DisputeMapper;
 import com.campus.trade.dispute.model.AdminDisputeRow;
 import com.campus.trade.dispute.vo.AdminDisputeVO;
@@ -13,6 +14,7 @@ import com.campus.trade.order.mapper.OrderMapper;
 import com.campus.trade.order.model.OrderStatus;
 import com.campus.trade.product.mapper.ProductMapper;
 import com.campus.trade.product.service.SellerDetailCacheInvalidator;
+import com.campus.trade.review.mapper.ReviewMapper;
 import com.campus.trade.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +50,12 @@ class DisputeServiceTest {
     private static final long ORDER_ID = 101L;
 
     @Mock
+    private DisputeEvidenceLogMapper evidenceLogMapper;
+
+    @Mock
+    private ReviewMapper reviewMapper;
+
+    @Mock
     private DisputeMapper disputeMapper;
 
     @Mock
@@ -68,9 +76,11 @@ class DisputeServiceTest {
     void setUp() {
         disputeService = new DisputeService(
                 disputeMapper,
+                evidenceLogMapper,
                 orderMapper,
                 productMapper,
                 userMapper,
+                reviewMapper,
                 cacheInvalidator,
                 new ObjectMapper()
         );

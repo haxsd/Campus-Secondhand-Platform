@@ -20,4 +20,7 @@ public interface ReviewMapper {
      * 摘要表就一定能被重新算对，不会因为某次更新失败而永久跑偏。</p>
      */
     int recalculateSellerCredit(@Param("sellerId") Long sellerId);
+
+    /** 按订单读取评价，纠纷详情展示下单后的评价事实。 */
+    TradeReview selectByOrderId(@Param("orderId") Long orderId);
 }
