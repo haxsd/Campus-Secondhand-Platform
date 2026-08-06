@@ -61,7 +61,9 @@ public class DisputeAgentSnapshotBuilder {
                 "productDescription", value(snapshot.productSnapshotAtOrder().description()),
                 "evidence", String.join("\n", snapshot.currentEvidence()),
                 "evidenceAdditions", snapshot.evidenceAdditions().stream()
-                        .map(DisputeAgentInputSnapshot.EvidenceAddition::statement).filter(value -> value != null).reduce((a,b)->a+"\n"+b).orElse("")
+                        .map(addition -> String.join("\n", value(addition.statement()),
+                                String.join("\n", addition.evidence() == null ? List.of() : addition.evidence())))
+                        .reduce((a, b) -> a + "\n" + b).orElse("")
         );
     }
 
