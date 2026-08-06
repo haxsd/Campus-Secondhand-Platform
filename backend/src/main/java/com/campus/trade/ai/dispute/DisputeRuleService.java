@@ -1,0 +1,3 @@
+package com.campus.trade.ai.dispute;
+import com.campus.trade.ai.rule.*; import org.springframework.core.io.ClassPathResource; import org.springframework.stereotype.Service; import java.nio.charset.StandardCharsets; import java.util.*;
+@Service public class DisputeRuleService { private volatile List<ProductReviewRule> rules; public List<ProductReviewRule> currentRules(){if(rules!=null)return rules;try{rules=List.copyOf(new ProductReviewRuleParser("DISPUTE_RULE").parse(new String(new ClassPathResource("ai-rules/dispute-rules-2026-01.md").getInputStream().readAllBytes(),StandardCharsets.UTF_8)));return rules;}catch(Exception e){throw new IllegalStateException("纠纷规则加载失败",e);}} public String currentVersion(){return currentRules().get(0).version();}}

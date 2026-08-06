@@ -5,6 +5,8 @@ import com.campus.trade.common.exception.ErrorCode;
 import com.campus.trade.common.response.CursorPageResult;
 import com.campus.trade.common.response.Result;
 import com.campus.trade.dispute.dto.HandleDisputeRequest;
+import com.campus.trade.ai.dispute.DisputeAgentRunVO;
+import com.campus.trade.ai.dispute.DisputeAgentService;
 import com.campus.trade.dispute.service.DisputeService;
 import com.campus.trade.dispute.vo.AdminDisputeVO;
 import com.campus.trade.dispute.vo.DisputeDetailVO;
@@ -35,9 +37,11 @@ import java.time.LocalDateTime;
 public class AdminDisputeController {
 
     private final DisputeService disputeService;
+    private final DisputeAgentService disputeAgentService;
 
-    public AdminDisputeController(DisputeService disputeService) {
+    public AdminDisputeController(DisputeService disputeService, DisputeAgentService disputeAgentService) {
         this.disputeService = disputeService;
+        this.disputeAgentService = disputeAgentService;
     }
 
     /**
@@ -69,6 +73,15 @@ public class AdminDisputeController {
         disputeService.handle(id, request);
         return Result.ok();
     }
+
+    @PostMapping("/{id}/ai-assist")
+    public Result<DisputeAgentRunVO> aiAssist(@PathVariable @Min(1) Long id) { return Result.ok(disputeAgentService.assist(id)); }
+
+    @GetMapping("/{id}/ai-assist")
+    public Result<DisputeAgentRunVO> aiAssistLatest(@PathVariable @Min(1) Long id) { return Result.ok(disputeAgentService.latest(id)); }
+
+    @PostMapping("/{id}/ai-assist/{runId}/adopt")
+    public Result<DisputeAgentRunVO> adopt(@PathVariable @Min(1) Long id, @PathVariable String runId, @RequestParam String action) { return Result.ok(disputeAgentService.adopt(id, runId, action)); }
 
     @GetMapping("/{id}")
     public Result<DisputeDetailVO> detail(@PathVariable @Min(1) Long id) {

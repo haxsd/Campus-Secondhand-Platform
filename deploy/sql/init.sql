@@ -257,6 +257,22 @@ CREATE TABLE `dispute_evidence_log` (
 -- 5. 初始数据
 -- ---------------------------------------------------------------------
 
+-- 纠纷辅助 Agent 运行表：只保存建议和追溯信息，绝不直接驱动裁决。
+CREATE TABLE `dispute_agent_run` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT, `run_id` VARCHAR(64) NOT NULL COMMENT '运行唯一标识',
+  `dispute_id` BIGINT NOT NULL COMMENT '纠纷 ID', `order_id` BIGINT NOT NULL COMMENT '订单 ID',
+  `status` VARCHAR(24) NOT NULL COMMENT '运行状态', `attempt` INT NOT NULL DEFAULT 0 COMMENT '模型尝试次数',
+  `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称', `rule_version` VARCHAR(40) NOT NULL COMMENT '规则版本',
+  `submitted_evidence_version` INT NOT NULL COMMENT '提交分析时的证据版本',
+  `input_snapshot` JSON NOT NULL COMMENT '脱敏输入快照', `input_digest` CHAR(64) NOT NULL COMMENT '输入快照 SHA-256',
+  `result_json` JSON NULL COMMENT '结构化建议结果', `error_code` VARCHAR(64) NULL COMMENT '错误码',
+  `error_message` VARCHAR(500) NULL COMMENT '错误信息', `triggered_by` BIGINT NOT NULL COMMENT '触发管理员',
+  `adopted_by` BIGINT NULL COMMENT '采纳建议的管理员', `adopted_at` DATETIME NULL COMMENT '采纳时间',
+  `adopted_action` VARCHAR(32) NULL COMMENT '采纳的建议动作', `started_at` DATETIME NULL, `finished_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_dispute_agent_run_id` (`run_id`), KEY `idx_dispute_agent_dispute_created` (`dispute_id`, `created_at`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='纠纷辅助 Agent 运行记录';
+
 CREATE TABLE `ai_agent_run` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `run_id` VARCHAR(64) NOT NULL,

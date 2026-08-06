@@ -17,6 +17,7 @@ public class AdminDisputeRow {
     private String statement;
     private String evidenceJson;
     private Integer status;
+    private Integer evidenceVersion;
     private String orderNo;
     private String productTitle;
     private String buyerName;
@@ -35,6 +36,8 @@ public class AdminDisputeRow {
     public String getEvidenceJson() { return evidenceJson; }
     public void setEvidenceJson(String evidenceJson) { this.evidenceJson = evidenceJson; }
     public Integer getStatus() { return status; }
+    public Integer getEvidenceVersion() { return evidenceVersion; }
+    public void setEvidenceVersion(Integer evidenceVersion) { this.evidenceVersion = evidenceVersion; }
     public void setStatus(Integer status) { this.status = status; }
     public String getOrderNo() { return orderNo; }
     public void setOrderNo(String orderNo) { this.orderNo = orderNo; }

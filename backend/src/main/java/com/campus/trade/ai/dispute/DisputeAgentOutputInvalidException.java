@@ -1,0 +1,1 @@
+package com.campus.trade.ai.dispute; public class DisputeAgentOutputInvalidException extends RuntimeException { public DisputeAgentOutputInvalidException(String m){super(m);} public DisputeAgentOutputInvalidException(String m,Throwable t){super(m,t);} }

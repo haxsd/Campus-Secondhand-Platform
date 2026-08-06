@@ -1,0 +1,2 @@
+package com.campus.trade.ai.dispute;
+public record DisputeAgentRunVO(String runId,String status,Integer submittedEvidenceVersion,String resultJson,String errorCode,String errorMessage,String adoptedAction) { public static DisputeAgentRunVO from(DisputeAgentRunEntity x){return new DisputeAgentRunVO(x.getRunId(),x.getStatus(),x.getSubmittedEvidenceVersion(),x.getResultJson(),x.getErrorCode(),x.getErrorMessage(),x.getAdoptedAction());}}
