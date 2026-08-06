@@ -1,4 +1,8 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
   application:
     # 应用名称会出现在日志中，后续接入监控时也用于识别服务。
     name: campus-trade
@@ -19,8 +23,12 @@ spring:
   ai:
     openai:
       base-url: ${AI_REVIEW_BASE_URL:https://api.deepseek.com}
-      api-key: ${DEEPSEEK_API_KEY:}
+      api-key: ${DEEPSEEK_API_KEY:disabled}
+      audio:
+        speech:
+          enabled: false
       chat:
+        enabled: ${AI_REVIEW_ENABLED:false}
         options:
           model: ${AI_REVIEW_MODEL:deepseek-v4-flash}
           response-format:
