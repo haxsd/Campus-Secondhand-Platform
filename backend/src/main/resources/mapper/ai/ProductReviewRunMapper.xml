@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.trade.ai.review.ProductReviewRunMapper">
+    <resultMap id="runMap" type="com.campus.trade.ai.review.ProductReviewRunEntity">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="agentType" column="agent_type"/>
+        <result property="productId" column="product_id"/>
+        <result property="sellerId" column="seller_id"/>
+        <result property="submittedProductVersion" column="submitted_product_version"/>
+        <result property="ruleVersion" column="rule_version"/>
+        <result property="modelName" column="model_name"/>
+        <result property="status" column="status"/>
+        <result property="attempt" column="attempt"/>
+        <result property="decision" column="decision"/>
+        <result property="riskLevel" column="risk_level"/>
+        <result property="confidence" column="confidence"/>
+        <result property="inputSnapshot" column="input_snapshot"/>
+        <result property="resultJson" column="result_json"/>
+        <result property="errorCode" column="error_code"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="finishedAt" column="finished_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <insert id="insert" parameterType="com.campus.trade.ai.review.ProductReviewRunEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_agent_run
+        (run_id, agent_type, product_id, seller_id, submitted_product_version, rule_version, model_name, status, attempt, input_snapshot)
+        VALUES (#{runId}, #{agentType}, #{productId}, #{sellerId}, #{submittedProductVersion}, #{ruleVersion},
+                #{modelName}, #{status}, #{attempt}, #{inputSnapshot})
+    </insert>
+    <select id="selectByRunId" resultMap="runMap">SELECT * FROM ai_agent_run WHERE run_id = #{runId} LIMIT 1</select>
+    <select id="selectLatestByProductId" resultMap="runMap">
+        SELECT * FROM ai_agent_run WHERE product_id = #{productId} ORDER BY id DESC LIMIT 1
+    </select>
+    <update id="markRunning">
+        UPDATE ai_agent_run SET status='RUNNING', attempt=attempt+1, started_at=COALESCE(started_at, CURRENT_TIMESTAMP)
+        WHERE run_id=#{runId} AND status='PENDING'
+    </update>
+    <update id="markSuccess">
+        UPDATE ai_agent_run SET status='SUCCEEDED', decision=#{decision}, risk_level=#{riskLevel},
+          confidence=#{confidence}, result_json=#{resultJson}, finished_at=CURRENT_TIMESTAMP
+        WHERE run_id=#{runId} AND status='RUNNING'
+    </update>
+    <update id="markFailure">
+        UPDATE ai_agent_run SET status=#{status}, error_code=#{errorCode}, error_message=#{errorMessage},
+          finished_at=CURRENT_TIMESTAMP
+        WHERE run_id=#{runId} AND status IN ('PENDING','RUNNING')
+    </update>
+    <update id="markStale">
+        UPDATE ai_agent_run SET status='STALE', error_code=#{errorCode}, finished_at=CURRENT_TIMESTAMP
+        WHERE run_id=#{runId} AND status IN ('RUNNING','SUCCEEDED')
+    </update>
+    <select id="selectStale" resultMap="runMap">
+        SELECT * FROM ai_agent_run
+        WHERE status IN ('PENDING','RUNNING') AND updated_at &lt; #{cutoff}
+        ORDER BY updated_at ASC, id ASC LIMIT #{limit}
+    </select>
+</mapper>

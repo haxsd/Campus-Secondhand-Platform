@@ -3,6 +3,9 @@ package com.campus.trade;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import com.campus.trade.ai.review.ProductReviewProperties;
 
 /**
  * 校园二手交易平台后端入口。
@@ -12,6 +15,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @SpringBootApplication
 @EnableScheduling
+@EnableAsync
+@EnableConfigurationProperties(ProductReviewProperties.class)
 public class CampusTradeApplication {
 
     /**

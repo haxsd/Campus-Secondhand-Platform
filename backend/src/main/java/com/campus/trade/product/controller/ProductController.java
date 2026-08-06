@@ -2,6 +2,9 @@ package com.campus.trade.product.controller;
 
 import com.campus.trade.common.response.PageResult;
 import com.campus.trade.common.response.Result;
+import com.campus.trade.ai.review.ProductReviewRunService;
+import com.campus.trade.ai.review.ProductReviewRunVO;
+import com.campus.trade.ai.review.ProductReviewSubmitVO;
 import com.campus.trade.product.dto.CreateProductRequest;
 import com.campus.trade.product.dto.StockAdjustRequest;
 import com.campus.trade.product.dto.UpdateProductRequest;
@@ -10,6 +13,7 @@ import com.campus.trade.product.vo.MyProductVO;
 import com.campus.trade.product.vo.ProductDetailVO;
 import com.campus.trade.product.vo.ProductIdVO;
 import com.campus.trade.product.vo.ProductListVO;
+import com.campus.trade.common.context.UserContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -40,9 +44,11 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductReviewRunService productReviewRunService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ProductReviewRunService productReviewRunService) {
         this.productService = productService;
+        this.productReviewRunService = productReviewRunService;
     }
 
     /**
@@ -107,11 +113,30 @@ public class ProductController {
      * 卖家申请上架，商品状态进入待审核。
      */
     @PostMapping("/{id}/submit-review")
-    public Result<Void> submitReview(
+    public Result<ProductReviewSubmitVO> submitReview(
             @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
     ) {
-        productService.submitReview(id);
-        return Result.ok();
+        return Result.ok(productReviewRunService.submit(id, UserContext.requireCurrentUser().userId()));
+    }
+
+    @GetMapping("/{productId}/ai-review-runs/{runId}")
+    public Result<ProductReviewRunVO> getAiReviewRun(
+            @PathVariable @Min(value = 1, message = "商品 ID 不合法") Long productId,
+            @PathVariable String runId
+    ) {
+        ProductReviewRunVO result = productReviewRunService.getRun(runId);
+        if (!productId.equals(result.productId())) {
+            throw new com.campus.trade.common.exception.BizException(
+                    com.campus.trade.common.exception.ErrorCode.NOT_FOUND, "审核运行不存在");
+        }
+        return Result.ok(result);
+    }
+
+    @GetMapping("/{productId}/ai-review-runs/latest")
+    public Result<ProductReviewRunVO> getLatestAiReviewRun(
+            @PathVariable @Min(value = 1, message = "商品 ID 不合法") Long productId
+    ) {
+        return Result.ok(productReviewRunService.getLatestRun(productId));
     }
 
     /**

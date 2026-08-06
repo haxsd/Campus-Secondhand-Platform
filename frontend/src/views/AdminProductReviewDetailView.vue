@@ -3,7 +3,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPendingProductDetail, reviewProduct } from '@/api/admin'
+import { getPendingProductDetail, reviewProduct, getAiReview } from '@/api/admin'
 import { ITEM_CONDITION, statusLabel } from '@/constants'
 
 const route = useRoute()
@@ -11,11 +11,13 @@ const router = useRouter()
 const detail = ref(null)
 const loading = ref(false)
 const acting = ref(false)
+const aiReview = ref(null)
 
 async function load() {
   loading.value = true
   try {
     detail.value = await getPendingProductDetail(route.params.id)
+    aiReview.value = await getAiReview(route.params.id)
   } catch {
     router.replace('/admin/products')
   } finally {
@@ -74,6 +76,24 @@ onMounted(load)
         <el-button type="success" :loading="acting" @click="review(true)">通过审核</el-button>
         <el-button type="danger" :loading="acting" @click="review(false)">驳回申请</el-button>
       </div>
+      <el-card v-if="aiReview?.latestRun" class="ai-card" shadow="never">
+        <template #header>AI初审结论（仅供管理员参考）</template>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="Decision">{{ aiReview.latestRun.decision }}</el-descriptions-item>
+          <el-descriptions-item label="Risk">{{ aiReview.latestRun.riskLevel }}</el-descriptions-item>
+          <el-descriptions-item label="Confidence">{{ aiReview.latestRun.confidence }}</el-descriptions-item>
+          <el-descriptions-item label="Run ID">{{ aiReview.latestRun.runId }}</el-descriptions-item>
+          <el-descriptions-item label="Reasons" :span="2">
+            <ul><li v-for="reason in aiReview.latestRun.reasons" :key="reason">{{ reason }}</li></ul>
+          </el-descriptions-item>
+          <el-descriptions-item label="Suggestions" :span="2">
+            <ul><li v-for="suggestion in aiReview.latestRun.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
+          </el-descriptions-item>
+          <el-descriptions-item label="Rule Refs" :span="2">
+            {{ aiReview.latestRun.ruleRefs?.map((rule) => `${rule.ruleId}@${rule.ruleVersion}`).join(', ') }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
     </el-card>
   </div>
 </template>

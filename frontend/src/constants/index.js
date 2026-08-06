@@ -14,6 +14,8 @@ export const PRODUCT_STATUS = {
 }
 
 // 订单状态（对应 trade_order.status）
+PRODUCT_STATUS[6] = { label: 'AI审核中', type: 'primary' }
+
 export const ORDER_STATUS = {
   0: { label: '待卖家确认', type: 'warning' },
   1: { label: '已确认', type: 'primary' },

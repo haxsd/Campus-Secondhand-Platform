@@ -16,6 +16,15 @@ spring:
       # Spring 在进入 Controller 前拒绝超过限制的 multipart 请求，和 FileStorageService 双重保护。
       max-file-size: 5MB
       max-request-size: 5MB
+  ai:
+    openai:
+      base-url: ${AI_REVIEW_BASE_URL:https://api.deepseek.com}
+      api-key: ${DEEPSEEK_API_KEY:}
+      chat:
+        options:
+          model: ${AI_REVIEW_MODEL:deepseek-v4-flash}
+          response-format:
+            type: json_object
 
 server:
   # 使用环境变量可让不同机器选择端口，未配置时默认 8080。
@@ -42,3 +51,15 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+
+ai:
+  review:
+    enabled: ${AI_REVIEW_ENABLED:false}
+    model: ${AI_REVIEW_MODEL:deepseek-v4-flash}
+    base-url: ${AI_REVIEW_BASE_URL:https://api.deepseek.com}
+    request-timeout: ${AI_REVIEW_REQUEST_TIMEOUT:35s}
+    stale-after: ${AI_REVIEW_STALE_AFTER:10m}
+    retry-backoff: ${AI_REVIEW_RETRY_BACKOFF:1s}
+    max-retries: ${AI_REVIEW_MAX_RETRIES:1}
+    scan-delay-ms: ${AI_REVIEW_SCAN_DELAY_MS:60000}
+    rule-domain: ${AI_REVIEW_RULE_DOMAIN:PRODUCT_RULE}

@@ -3,11 +3,11 @@
 // - 顶部按状态筛选（全部 / 草稿 / 待审核 / 驳回 / 在售 / 已下架 / 已售罄）
 // - 表格每行按"商品当前状态"显示不同的操作按钮（状态机：不同状态能做的事不一样）
 // 操作对应后端卖家接口：申请上架 / 撤回申请 / 下架 / 调库存 / 编辑。每次操作成功后刷新列表。
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Picture, QuestionFilled } from '@element-plus/icons-vue'
-import { getMyProducts, submitReview, withdrawReview, offShelf, adjustStock } from '@/api/product'
+import { getMyProducts, submitReview, withdrawReview, offShelf, adjustStock, getAiReviewRun, getLatestAiReviewRun } from '@/api/product'
 import { PRODUCT_STATUS, statusLabel, statusType } from '@/constants'
 
 const router = useRouter()
@@ -15,6 +15,7 @@ const router = useRouter()
 const activeStatus = ref('') // 当前筛选的状态，'' = 全部
 const list = ref([])
 const loading = ref(false)
+const pollingTimers = new Map()
 
 // 每件"在售"商品在"调库存"弹窗里输入的增减量，按商品 id 存（默认 +1）
 const deltaMap = reactive({})
@@ -63,7 +64,39 @@ async function doAction(action, successMsg) {
 }
 
 function onSubmitReview(row) {
-  doAction(() => submitReview(row.id), '已提交审核，请等待管理员审核')
+  doAction(async () => {
+    const result = await submitReview(row.id)
+    if (result?.runId) startPolling(row.id, result.runId)
+  }, '已提交审核，请等待管理员审核')
+}
+
+function startPolling(productId, runId) {
+  stopPolling(productId)
+  let attempts = 0
+  const timer = window.setInterval(async () => {
+    attempts += 1
+    try {
+      const result = await getAiReviewRun(productId, runId)
+      if (result && !['PENDING', 'RUNNING'].includes(result.status)) {
+        stopPolling(productId)
+        await loadList()
+      } else if (attempts >= 120) {
+        stopPolling(productId)
+        ElMessage.warning('AI审核等待超时，请稍后刷新查看')
+      }
+    } catch {
+      if (attempts >= 120) stopPolling(productId)
+    }
+  }, 500)
+  pollingTimers.set(productId, timer)
+}
+
+function stopPolling(productId) {
+  const timer = pollingTimers.get(productId)
+  if (timer) {
+    window.clearInterval(timer)
+    pollingTimers.delete(productId)
+  }
 }
 
 function onWithdraw(row) {
@@ -83,7 +116,18 @@ function onAdjustStock(row) {
   doAction(() => adjustStock(row.id, delta), '库存已更新')
 }
 
-onMounted(loadList)
+onMounted(async () => {
+  await loadList()
+  list.value.filter((row) => row.status === 6).forEach(async (row) => {
+    try {
+      const run = await getLatestAiReviewRun(row.id)
+      if (run?.runId) startPolling(row.id, run.runId)
+    } catch {
+      ElMessage.warning('AI审核状态暂时无法获取，请稍后刷新')
+    }
+  })
+})
+onUnmounted(() => list.value.forEach((row) => stopPolling(row.id)))
 </script>
 
 <template>
@@ -156,6 +200,10 @@ onMounted(loadList)
             </template>
 
             <!-- 在售(3) / 已售罄(5)：下架 + 调库存（售罄商品补货后后端会自动恢复为在售） -->
+            <template v-else-if="row.status === 6">
+              <el-button size="small" type="primary" loading disabled>AI审核中</el-button>
+            </template>
+
             <template v-else-if="[3, 5].includes(row.status)">
               <el-popconfirm title="确认下架该商品？" @confirm="onOffShelf(row)">
                 <template #reference>

@@ -1,6 +1,8 @@
 package com.campus.trade.product.controller;
 
 import com.campus.trade.common.response.Result;
+import com.campus.trade.ai.review.AdminProductReviewVO;
+import com.campus.trade.ai.review.ProductReviewRunService;
 import com.campus.trade.product.dto.ProductReviewRequest;
 import com.campus.trade.product.service.ProductService;
 import com.campus.trade.product.vo.PendingProductVO;
@@ -30,9 +32,11 @@ import java.util.List;
 public class AdminProductController {
 
     private final ProductService productService;
+    private final ProductReviewRunService productReviewRunService;
 
-    public AdminProductController(ProductService productService) {
+    public AdminProductController(ProductService productService, ProductReviewRunService productReviewRunService) {
         this.productService = productService;
+        this.productReviewRunService = productReviewRunService;
     }
 
     /**
@@ -49,6 +53,13 @@ public class AdminProductController {
             @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
     ) {
         return Result.ok(productService.getPendingDetailForAdmin(id));
+    }
+
+    @GetMapping("/{id}/ai-review")
+    public Result<AdminProductReviewVO> getAiReview(
+            @PathVariable @Min(value = 1, message = "商品 ID 不合法") Long id
+    ) {
+        return Result.ok(productReviewRunService.getAdminReview(id));
     }
 
     /**

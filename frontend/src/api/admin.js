@@ -24,6 +24,11 @@ export function reviewProduct(id, data) {
   return post(`/admin/products/${id}/review`, data)
 }
 
+export function getAiReview(id) {
+  if (useMock) return Promise.resolve(null)
+  return get(`/admin/products/${id}/ai-review`)
+}
+
 // GET /api/admin/disputes —— 纠纷列表（params: { status, cursorCreatedAt, cursorId, pageSize }）
 export function getDisputes(params) {
   if (useMock) return mockGetDisputes(params)

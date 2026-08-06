@@ -15,7 +15,8 @@ public enum ProductStatus {
     REJECTED(2),
     ON_SALE(3),
     OFF_SHELF(4),
-    SOLD_OUT(5);
+    SOLD_OUT(5),
+    AI_REVIEWING(6);
 
     private final int code;
 

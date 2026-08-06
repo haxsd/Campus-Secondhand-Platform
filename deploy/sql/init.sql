@@ -113,6 +113,13 @@ CREATE TABLE `product_review_log` (
 ) ENGINE=InnoDB COMMENT='商品人工审核日志';
 
 -- 浏览记录表
+ALTER TABLE `product_review_log`
+  MODIFY COLUMN `reviewer_id` BIGINT DEFAULT NULL,
+  MODIFY COLUMN `result` TINYINT NOT NULL,
+  ADD COLUMN `operator_type` TINYINT NOT NULL DEFAULT 0,
+  ADD COLUMN `run_id` VARCHAR(64) DEFAULT NULL,
+  ADD KEY `idx_run` (`run_id`);
+
 CREATE TABLE `browse_history` (
   `id`              BIGINT   NOT NULL AUTO_INCREMENT,
   `user_id`         BIGINT   NOT NULL,
@@ -233,6 +240,84 @@ CREATE TABLE `dispute` (
 -- ---------------------------------------------------------------------
 -- 5. 初始数据
 -- ---------------------------------------------------------------------
+
+CREATE TABLE `ai_agent_run` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `run_id` VARCHAR(64) NOT NULL,
+  `agent_type` VARCHAR(40) NOT NULL,
+  `product_id` BIGINT NOT NULL,
+  `seller_id` BIGINT NOT NULL,
+  `submitted_product_version` INT NOT NULL,
+  `rule_version` VARCHAR(40) NOT NULL,
+  `model_name` VARCHAR(100) DEFAULT NULL,
+  `status` VARCHAR(30) NOT NULL COMMENT 'PENDING/RUNNING/SUCCEEDED/FAILED/TIMEOUT/INVALID_OUTPUT/STALE/DISABLED',
+  `attempt` INT NOT NULL DEFAULT 0,
+  `decision` VARCHAR(30) DEFAULT NULL,
+  `risk_level` VARCHAR(20) DEFAULT NULL,
+  `confidence` DECIMAL(5,4) DEFAULT NULL,
+  `input_snapshot` JSON NOT NULL,
+  `result_json` JSON DEFAULT NULL,
+  `error_code` VARCHAR(50) DEFAULT NULL,
+  `error_message` VARCHAR(500) DEFAULT NULL,
+  `started_at` DATETIME DEFAULT NULL,
+  `finished_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_run_id` (`run_id`),
+  KEY `idx_product_created` (`product_id`, `created_at`, `id`),
+  KEY `idx_status_updated` (`status`, `updated_at`, `id`)
+) ENGINE=InnoDB COMMENT='商品合规AI审核运行记录';
+
+CREATE TABLE `ai_rule_set` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `rule_version` VARCHAR(40) NOT NULL,
+  `domain` VARCHAR(40) NOT NULL,
+  `title` VARCHAR(100) NOT NULL,
+  `effective_at` DATETIME NOT NULL,
+  `expired_at` DATETIME DEFAULT NULL,
+  `status` TINYINT NOT NULL DEFAULT 1,
+  `deleted` TINYINT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rule_version_domain` (`domain`, `rule_version`),
+  KEY `idx_rule_effective` (`domain`, `status`, `effective_at`, `id`)
+) ENGINE=InnoDB COMMENT='AI商品审核规则版本';
+
+CREATE TABLE `ai_rule_fragment` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `rule_set_id` BIGINT NOT NULL,
+  `rule_id` VARCHAR(60) NOT NULL,
+  `rule_version` VARCHAR(40) NOT NULL,
+  `domain` VARCHAR(40) NOT NULL,
+  `title` VARCHAR(200) NOT NULL,
+  `content_hash` VARCHAR(128) NOT NULL,
+  `vector_doc_id` VARCHAR(128) DEFAULT NULL,
+  `deleted` TINYINT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rule_fragment` (`domain`, `rule_id`, `rule_version`),
+  KEY `idx_rule_set` (`rule_set_id`, `deleted`),
+  KEY `idx_rule_filter` (`domain`, `rule_version`, `deleted`)
+) ENGINE=InnoDB COMMENT='AI商品审核规则片段';
+
+CREATE TABLE `ai_rule_reference` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `run_id` VARCHAR(64) NOT NULL,
+  `rule_set_id` BIGINT NOT NULL,
+  `rule_id` VARCHAR(60) NOT NULL,
+  `rule_version` VARCHAR(40) NOT NULL,
+  `domain` VARCHAR(40) NOT NULL,
+  `chunk_id` VARCHAR(128) DEFAULT NULL,
+  `retrieval_score` DECIMAL(10,6) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_run_rule_chunk` (`run_id`, `rule_id`, `rule_version`, `chunk_id`),
+  KEY `idx_run` (`run_id`, `id`),
+  KEY `idx_rule` (`domain`, `rule_version`, `rule_id`)
+) ENGINE=InnoDB COMMENT='AI审核命中的规则引用';
 
 INSERT INTO `category` (`name`, `sort`) VALUES
 ('数码电子', 1), ('图书教材', 2), ('生活用品', 3),

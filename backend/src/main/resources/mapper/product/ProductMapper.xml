@@ -133,6 +133,10 @@
         ORDER BY updated_at ASC, id ASC
     </select>
 
+    <select id="selectVersion" resultType="int">
+        SELECT version FROM product WHERE id = #{id} AND deleted = 0
+    </select>
+
     <select id="selectImageUrlsByProductId" resultType="string">
         SELECT url
         FROM product_image
@@ -219,6 +223,31 @@
           AND deleted = 0
     </update>
 
+    <update id="submitAiReviewBySeller">
+        UPDATE product
+        SET status = 6, version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status IN (0, 2, 4)
+          AND stock &gt; 0
+          AND deleted = 0
+    </update>
+
+    <update id="completeAiReview">
+        UPDATE product SET status = 1, version = version + 1
+        WHERE id = #{id} AND status = 6 AND version = #{submittedProductVersion} AND deleted = 0
+    </update>
+
+    <update id="fallbackAiReview">
+        UPDATE product SET status = 1, version = version + 1
+        WHERE id = #{id} AND status = 6 AND version = #{submittedProductVersion} AND deleted = 0
+    </update>
+
+    <update id="disableAiReviewBySeller">
+        UPDATE product SET status = 1, version = version + 1
+        WHERE id = #{id} AND seller_id = #{sellerId} AND status = 6 AND deleted = 0
+    </update>
+
     <update id="withdrawReviewBySeller">
         UPDATE product
         SET status = 0,
@@ -301,5 +330,10 @@
     <insert id="insertReviewLog">
         INSERT INTO product_review_log (product_id, reviewer_id, result, reason)
         VALUES (#{productId}, #{reviewerId}, #{result}, #{reason})
+    </insert>
+
+    <insert id="insertAiReviewLog">
+        INSERT INTO product_review_log (product_id, reviewer_id, result, reason, operator_type, run_id)
+        VALUES (#{productId}, NULL, #{result}, #{reason}, 1, #{runId})
     </insert>
 </mapper>
