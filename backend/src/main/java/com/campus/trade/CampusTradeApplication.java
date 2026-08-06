@@ -6,7 +6,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import com.campus.trade.ai.review.ProductReviewProperties;
-import com.campus.trade.ai.dispute.DisputeAgentProperties;
 
 /**
  * 校园二手交易平台后端入口。
@@ -17,7 +16,7 @@ import com.campus.trade.ai.dispute.DisputeAgentProperties;
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
-@EnableConfigurationProperties({ProductReviewProperties.class, DisputeAgentProperties.class})
+@EnableConfigurationProperties(ProductReviewProperties.class)
 public class CampusTradeApplication {
 
     /**

@@ -3,7 +3,7 @@
 // 四种处理动作对应订单不同走向：驳回(恢复原状态)/维持完成/取消交易(可退货回补库存)/待补材料。
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getDisputeDetail, getDisputes, handleDispute, triggerDisputeAiAssist, getDisputeAiAssist, adoptDisputeAiAssist } from '@/api/admin'
+import { getDisputeDetail, getDisputes, handleDispute } from '@/api/admin'
 import { DISPUTE_STATUS, DISPUTE_REASON, statusLabel, statusType } from '@/constants'
 
 const list = ref([])
@@ -83,13 +83,11 @@ const dialogVisible = ref(false)
 const submitting = ref(false)
 const current = ref(null) // 当前处理的纠纷行
 const detail = ref(null)
-const aiRun = ref(null)
 const form = reactive({ action: 'REJECT', restock: true, note: '' })
 
 function openHandle(row) {
   current.value = row
   detail.value = null
-  aiRun.value = null
   getDisputeDetail(row.id).then((value) => { detail.value = value }).catch(() => {})
   form.action = 'REJECT'
   form.restock = true
@@ -119,10 +117,6 @@ async function submitHandle() {
     submitting.value = false
   }
 }
-
-
-async function startAiAssist() { aiRun.value = await triggerDisputeAiAssist(current.value.id); if (aiRun.value?.runId) { setTimeout(async () => { aiRun.value = await getDisputeAiAssist(current.value.id) }, 1500) } }
-async function adoptAi() { const action = JSON.parse(aiRun.value.resultJson).suggestedAction; await adoptDisputeAiAssist(current.value.id, aiRun.value.runId, action); form.action = action; ElMessage.success('AI 建议已预填，请确认后提交') }
 
 onMounted(loadList)
 </script>
@@ -213,14 +207,6 @@ onMounted(loadList)
     </div>
 
     <!-- 处理 dialog -->
-    <el-card v-if="current" shadow="never" class="ai-card">
-      <template #header>AI 辅助分析（仅供参考，最终裁决由管理员做出）</template>
-      <el-button :disabled="!detail || ![0, 1].includes(detail.status)" @click="startAiAssist">触发 AI 分析</el-button>
-      <div v-if="aiRun">状态：{{ aiRun.status }}</div>
-      <pre v-if="aiRun?.resultJson">{{ aiRun.resultJson }}</pre>
-      <el-button v-if="aiRun?.status === 'SUCCEEDED'" @click="adoptAi">采纳建议并预填裁决</el-button>
-    </el-card>
-
     <el-dialog v-model="dialogVisible" title="处理纠纷" width="560px">
       <template v-if="current">
         <el-descriptions :column="1" border class="detail">

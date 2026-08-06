@@ -46,7 +46,3 @@ export function handleDispute(id, data) {
 export function getDisputeDetail(id) {
   return get(`/admin/disputes/${id}`)
 }
-
-export function triggerDisputeAiAssist(id) { return post(`/admin/disputes/${id}/ai-assist`) }
-export function getDisputeAiAssist(id) { return get(`/admin/disputes/${id}/ai-assist`) }
-export function adoptDisputeAiAssist(id, runId, action) { return post(`/admin/disputes/${id}/ai-assist/${runId}/adopt`, { action }) }
