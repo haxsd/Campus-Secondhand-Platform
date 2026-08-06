@@ -668,8 +668,10 @@ AI_RESULT_WRITE_CONFLICT
 规则源文件建议：
 
 ```text
-docs/ai-rules/product-rules-2026-01.md
+backend/src/main/resources/ai-rules/product-rules-2026-01.md
 ```
+
+规则语料会随后端 fat jar 一起打包，因此放在 `backend/src/main/resources/`，而不是放在不会进入 jar 的 `docs/` 目录。
 
 每条规则必须使用固定区块格式：
 
