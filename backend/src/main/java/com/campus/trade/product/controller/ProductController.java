@@ -139,6 +139,22 @@ public class ProductController {
         return Result.ok(productReviewRunService.getLatestRun(productId));
     }
 
+    @GetMapping("/{id}/ai-review")
+    public Result<com.campus.trade.ai.review.AdminProductReviewVO> getSellerAiReview(
+            @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
+    ) {
+        return Result.ok(productReviewRunService.getSellerReview(
+                id, UserContext.requireCurrentUser().userId()));
+    }
+
+    @PostMapping("/{id}/request-manual-review")
+    public Result<Void> requestManualReview(
+            @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
+    ) {
+        productReviewRunService.requestManualReview(id, UserContext.requireCurrentUser().userId());
+        return Result.ok();
+    }
+
     /**
      * 卖家撤回待审核申请，商品状态回到草稿。
      */

@@ -57,13 +57,13 @@ public class ProductReviewAgentService {
                 .call()
                 .content();
         if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("AI_OUTPUT_INVALID:模型返回为空");
+            throw new ProductReviewOutputInvalidException("AI_OUTPUT_INVALID:模型返回为空");
         }
         try {
             ObjectMapper strict = objectMapper.copy()
                     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
             ProductReviewResult result = strict.readValue(raw, ProductReviewResult.class);
-            validator.validate(result, allowed);
+            validator.validate(result, allowed, snapshot);
             return result;
         } catch (Exception exception) {
             throw new ProductReviewOutputInvalidException("AI_OUTPUT_INVALID:结构化输出校验失败", exception);

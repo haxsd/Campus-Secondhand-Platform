@@ -6,6 +6,7 @@ import java.util.List;
 public record AdminProductReviewVO(
         Long productId,
         Integer productStatus,
+        Integer latestOperatorType,
         ProductReviewRunDetail latestRun
 ) {
     public record ProductReviewRunDetail(

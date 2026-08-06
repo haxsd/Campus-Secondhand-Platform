@@ -116,7 +116,7 @@ CREATE TABLE `product_review_log` (
 ALTER TABLE `product_review_log`
   MODIFY COLUMN `reviewer_id` BIGINT DEFAULT NULL,
   MODIFY COLUMN `result` TINYINT NOT NULL,
-  ADD COLUMN `operator_type` TINYINT NOT NULL DEFAULT 0,
+  ADD COLUMN `operator_type` TINYINT NOT NULL DEFAULT 0 COMMENT '0管理员人工审核 1 AI审核 2卖家申请人工复核',
   ADD COLUMN `run_id` VARCHAR(64) DEFAULT NULL,
   ADD KEY `idx_run` (`run_id`);
 

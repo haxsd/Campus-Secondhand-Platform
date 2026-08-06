@@ -66,6 +66,16 @@ export function getLatestAiReviewRun(productId) {
   return get(`/products/${productId}/ai-review-runs/latest`)
 }
 
+export function getSellerAiReview(productId) {
+  if (useMock) return Promise.resolve(null)
+  return get(`/products/${productId}/ai-review`)
+}
+
+export function requestManualReview(productId) {
+  if (useMock) return Promise.resolve()
+  return post(`/products/${productId}/request-manual-review`)
+}
+
 // POST /api/products/{id}/withdraw-review —— 撤回审核申请
 export function withdrawReview(id) {
   if (useMock) return mockWithdrawReview(id)

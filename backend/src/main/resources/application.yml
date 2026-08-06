@@ -71,3 +71,4 @@ ai:
     max-retries: ${AI_REVIEW_MAX_RETRIES:1}
     scan-delay-ms: ${AI_REVIEW_SCAN_DELAY_MS:60000}
     rule-domain: ${AI_REVIEW_RULE_DOMAIN:PRODUCT_RULE}
+    auto-reject-min-confidence: ${AI_REVIEW_AUTO_REJECT_MIN_CONFIDENCE:0.8}

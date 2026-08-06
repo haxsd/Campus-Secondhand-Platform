@@ -125,17 +125,10 @@ public class ProductReviewRunService {
         try {
             Map<String, Object> snapshot = objectMapper.readValue(
                     run.getInputSnapshot(), new TypeReference<Map<String, Object>>() {});
-            ProductReviewResult result = reviewWithRetry(snapshot);
-            String resultJson = objectMapper.writeValueAsString(result);
-            runMapper.markSuccess(runId, result.decision().name(), result.riskLevel().name(),
-                    result.confidence(), resultJson);
-            productMapper.insertAiReviewLog(run.getProductId(), runId,
-                    result.decision() == ProductReviewDecision.PASS ? 1
-                            : result.decision() == ProductReviewDecision.REJECT ? 2 : 3,
-                    String.join("；", result.reasons()));
-            if (productMapper.completeAiReview(run.getProductId(), run.getSubmittedProductVersion()) == 0) {
-                runMapper.markStale(runId, "VERSION_OR_STATUS_CHANGED");
-            } else {
+            ProductReviewResult result = normalizeDecision(reviewWithRetry(snapshot));
+            int targetStatus = result.decision() == ProductReviewDecision.REJECT
+                    && result.confidence() >= properties.getAutoRejectMinConfidence() ? 2 : 1;
+            if (persistenceService.complete(run, result, targetStatus)) {
                 registerCacheInvalidation(run.getProductId());
             }
         } catch (ProductReviewOutputInvalidException exception) {
@@ -150,7 +143,7 @@ public class ProductReviewRunService {
         while (true) {
             try {
                 return agentService.review(snapshot);
-            } catch (IllegalArgumentException exception) {
+            } catch (ProductReviewOutputInvalidException exception) {
                 if (attempts++ >= Math.min(1, properties.getMaxRetries())) throw exception;
                 sleepBeforeRetry();
             } catch (Exception exception) {
@@ -158,6 +151,16 @@ public class ProductReviewRunService {
                 sleepBeforeRetry();
             }
         }
+    }
+
+    private ProductReviewResult normalizeDecision(ProductReviewResult result) {
+        if (result.decision() == ProductReviewDecision.REJECT
+                && result.confidence() < properties.getAutoRejectMinConfidence()) {
+            return new ProductReviewResult(ProductReviewDecision.NEED_MANUAL_REVIEW,
+                    result.riskLevel(), result.confidence(), result.reasons(),
+                    result.suggestions(), result.ruleRefs());
+        }
+        return result;
     }
 
     private boolean isRetryable(Exception exception) {
@@ -219,16 +222,60 @@ public class ProductReviewRunService {
         Product product = productMapper.selectById(productId)
                 .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
         ProductReviewRunEntity run = runMapper.selectLatestByProductId(productId);
-        if (run == null || run.getResultJson() == null) return new AdminProductReviewVO(productId, product.getStatus(), null);
+        Integer operatorType = productMapper.selectLatestReviewOperatorType(productId);
+        if (run == null || run.getResultJson() == null) {
+            return new AdminProductReviewVO(productId, product.getStatus(), operatorType, null);
+        }
         try {
             ProductReviewResult result = objectMapper.readValue(run.getResultJson(), ProductReviewResult.class);
-            return new AdminProductReviewVO(productId, product.getStatus(),
+            return new AdminProductReviewVO(productId, product.getStatus(), operatorType,
                     new AdminProductReviewVO.ProductReviewRunDetail(run.getRunId(), run.getStatus(),
                             result.decision(), result.riskLevel(), result.confidence(), result.reasons(),
-                            result.suggestions(), result.ruleRefs(), run.getFinishedAt()));
+                            result.suggestions(), enrichRuleRefs(result.ruleRefs()), run.getFinishedAt()));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("AI审核结果读取失败", exception);
         }
+    }
+
+    @Transactional
+    public void requestManualReview(Long productId, Long sellerId) {
+        Product product = productMapper.selectById(productId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
+        if (!sellerId.equals(product.getSellerId())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权操作该商品");
+        }
+        if (product.getStatus() != ProductStatus.REJECTED.getCode()) {
+            throw new BizException(ErrorCode.CONFLICT, "当前商品不是 AI 驳回状态");
+        }
+        if (!Integer.valueOf(ProductReviewOperatorType.AI).equals(
+                productMapper.selectLatestReviewOperatorType(productId))) {
+            throw new BizException(ErrorCode.CONFLICT, "仅支持对 AI 驳回结果申请人工复核");
+        }
+        if (productMapper.appealAiRejectBySeller(productId, sellerId) == 0) {
+            throw new BizException(ErrorCode.CONFLICT, "商品状态已变化，请刷新后重试");
+        }
+        productMapper.insertSellerAppealLog(productId, "卖家申请人工复核");
+        registerCacheInvalidation(productId);
+    }
+
+    public AdminProductReviewVO getSellerReview(Long productId, Long sellerId) {
+        Product product = productMapper.selectById(productId)
+                .orElseThrow(() -> new BizException(ErrorCode.NOT_FOUND, "商品不存在"));
+        if (!sellerId.equals(product.getSellerId())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无权查看该审核");
+        }
+        return getAdminReview(productId);
+    }
+
+    private List<ProductReviewResult.RuleRef> enrichRuleRefs(List<ProductReviewResult.RuleRef> refs) {
+        Map<String, com.campus.trade.ai.rule.ProductReviewRule> rules = ruleService.currentRules().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        rule -> rule.ruleId() + "@" + rule.version(), rule -> rule));
+        return refs.stream().map(ref -> {
+            var rule = rules.get(ref.ruleId() + "@" + ref.ruleVersion());
+            return rule == null || ref.title() != null ? ref
+                    : new ProductReviewResult.RuleRef(ref.ruleId(), ref.ruleVersion(), rule.title(), ref.evidence());
+        }).toList();
     }
 
     private Map<String, Object> snapshot(Product product, int version) {

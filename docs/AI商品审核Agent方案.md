@@ -1,3 +1,5 @@
+> **当前实现口径（2026-08）**：AI 只有“拦截”权，没有自动放行权。`PASS` 和低置信度 `REJECT` 统一回到 `PENDING_REVIEW(1)`，由管理员人工决定是否上架；`REJECT` 且 `confidence >= ai.review.auto-reject-min-confidence`（默认 `0.8`）时，商品才条件更新为 `REJECTED(2)`。卖家可以通过 `POST /products/{id}/request-manual-review` 对 AI 驳回商品申请人工复核，人工驳回不提供该入口。每个命中的 `ruleRef` 必须带有从商品标题或描述逐字截取的 `evidence`，管理员端展示规则标题和证据。
+
 # 商品合规审核 Agent 技术方案（第一版）
 
 > 文档状态：方案草案  

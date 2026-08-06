@@ -79,11 +79,16 @@ public interface ProductMapper {
 
     int selectVersion(@Param("id") Long id);
 
-    int completeAiReview(@Param("id") Long id, @Param("submittedProductVersion") Integer submittedProductVersion);
+    int completeAiReview(@Param("id") Long id, @Param("submittedProductVersion") Integer submittedProductVersion,
+                         @Param("targetStatus") Integer targetStatus);
 
     int fallbackAiReview(@Param("id") Long id, @Param("submittedProductVersion") Integer submittedProductVersion);
 
     int disableAiReviewBySeller(@Param("id") Long id, @Param("sellerId") Long sellerId);
+
+    int appealAiRejectBySeller(@Param("id") Long id, @Param("sellerId") Long sellerId);
+
+    Integer selectLatestReviewOperatorType(@Param("productId") Long productId);
 
     /** 卖家撤回待审核商品，回到草稿。 */
     int withdrawReviewBySeller(@Param("id") Long id, @Param("sellerId") Long sellerId);
@@ -130,4 +135,6 @@ public interface ProductMapper {
 
     int insertAiReviewLog(@Param("productId") Long productId, @Param("runId") String runId,
                           @Param("result") Integer result, @Param("reason") String reason);
+
+    int insertSellerAppealLog(@Param("productId") Long productId, @Param("reason") String reason);
 }

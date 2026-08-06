@@ -234,7 +234,7 @@
     </update>
 
     <update id="completeAiReview">
-        UPDATE product SET status = 1, version = version + 1
+        UPDATE product SET status = #{targetStatus}, version = version + 1
         WHERE id = #{id} AND status = 6 AND version = #{submittedProductVersion} AND deleted = 0
     </update>
 
@@ -243,10 +243,33 @@
         WHERE id = #{id} AND status = 6 AND version = #{submittedProductVersion} AND deleted = 0
     </update>
 
+    <update id="appealAiRejectBySeller">
+        UPDATE product SET status = 1, version = version + 1
+        WHERE id = #{id}
+          AND seller_id = #{sellerId}
+          AND status = 2
+          AND deleted = 0
+    </update>
+
+    <select id="selectLatestReviewOperatorType" resultType="int">
+        SELECT operator_type
+        FROM product_review_log
+        WHERE product_id = #{productId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+
     <update id="disableAiReviewBySeller">
         UPDATE product SET status = 1, version = version + 1
         WHERE id = #{id} AND seller_id = #{sellerId} AND status = 6 AND deleted = 0
     </update>
+
+    <insert id="insertSellerAppealLog">
+        INSERT INTO product_review_log
+            (product_id, reviewer_id, result, reason, operator_type, run_id)
+        VALUES
+            (#{productId}, NULL, 3, #{reason}, 2, NULL)
+    </insert>
 
     <update id="withdrawReviewBySeller">
         UPDATE product

@@ -7,7 +7,7 @@ import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Picture, QuestionFilled } from '@element-plus/icons-vue'
-import { getMyProducts, submitReview, withdrawReview, offShelf, adjustStock, getAiReviewRun, getLatestAiReviewRun } from '@/api/product'
+import { getMyProducts, submitReview, withdrawReview, offShelf, adjustStock, getAiReviewRun, getLatestAiReviewRun, getSellerAiReview, requestManualReview } from '@/api/product'
 import { PRODUCT_STATUS, statusLabel, statusType } from '@/constants'
 
 const router = useRouter()
@@ -36,6 +36,15 @@ async function loadList() {
     res.forEach((p) => {
       if (deltaMap[p.id] === undefined) deltaMap[p.id] = 1
     })
+    await Promise.all(res.filter((p) => p.status === 2).map(async (p) => {
+      try {
+        const review = await getSellerAiReview(p.id)
+        p.aiReview = review?.latestRun || null
+        p.aiReviewOperatorType = review?.latestOperatorType
+      } catch {
+        p.aiReview = null
+      }
+    }))
   } finally {
     loading.value = false
   }
@@ -101,6 +110,10 @@ function stopPolling(productId) {
 
 function onWithdraw(row) {
   doAction(() => withdrawReview(row.id), '已撤回申请，商品回到草稿')
+}
+
+function onRequestManualReview(row) {
+  doAction(() => requestManualReview(row.id), '已提交人工复核申请')
 }
 
 function onOffShelf(row) {
@@ -174,6 +187,12 @@ onUnmounted(() => list.value.forEach((row) => stopPolling(row.id)))
             <el-tooltip v-if="row.status === 2 && row.rejectReason" :content="row.rejectReason">
               <el-icon class="reason-icon"><QuestionFilled /></el-icon>
             </el-tooltip>
+            <div v-if="row.status === 2 && row.aiReview" class="ai-reject-summary">
+              <div v-for="reason in row.aiReview.reasons" :key="reason">{{ reason }}</div>
+              <div v-for="rule in row.aiReview.ruleRefs" :key="`${rule.ruleId}-${rule.ruleVersion}`">
+                {{ rule.title || rule.ruleId }}<span v-if="rule.evidence">：{{ rule.evidence }}</span>
+              </div>
+            </div>
           </template>
         </el-table-column>
 
@@ -183,6 +202,8 @@ onUnmounted(() => list.value.forEach((row) => stopPolling(row.id)))
             <!-- 草稿(0)/驳回(2)/已下架(4)：可编辑 + 申请上架 -->
             <template v-if="[0, 2, 4].includes(row.status)">
               <el-button size="small" @click="goEdit(row)">编辑</el-button>
+              <el-button v-if="row.status === 2 && row.aiReview?.decision === 'REJECT' && row.aiReviewOperatorType === 1"
+                size="small" type="warning" @click="onRequestManualReview(row)">申请人工复核</el-button>
               <el-popconfirm title="确认提交审核？" @confirm="onSubmitReview(row)">
                 <template #reference>
                   <el-button size="small" type="primary">申请上架</el-button>
@@ -250,6 +271,13 @@ onUnmounted(() => list.value.forEach((row) => stopPolling(row.id)))
   width: 60px;
   height: 60px;
   border-radius: 8px;
+}
+
+.ai-reject-summary {
+  margin-top: 6px;
+  color: var(--el-color-danger);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .cover-ph {

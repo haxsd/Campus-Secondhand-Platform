@@ -3,6 +3,7 @@ package com.campus.trade.ai.review;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -54,5 +55,23 @@ class ProductReviewValidatorTest {
         assertThrows(IllegalArgumentException.class, () -> validator.validate(
                 new ProductReviewResult(ProductReviewDecision.REJECT, ProductReviewRiskLevel.HIGH, .9,
                         List.of(), List.of(), List.of()), RULES));
+    }
+
+    @Test
+    void rejectsRejectWithEvidenceNotInProductText() {
+        assertThrows(ProductReviewOutputInvalidException.class, () -> validator.validate(
+                new ProductReviewResult(ProductReviewDecision.REJECT, ProductReviewRiskLevel.HIGH, .9,
+                        List.of("违规"), List.of(),
+                        List.of(new ProductReviewResult.RuleRef("PRODUCT-001", "2026-01", "规则", "模型编造"))),
+                RULES, Map.of("title", "二手教材", "description", "九成新教材")));
+    }
+
+    @Test
+    void acceptsRejectWithEvidenceFromProductText() {
+        validator.validate(
+                new ProductReviewResult(ProductReviewDecision.REJECT, ProductReviewRiskLevel.HIGH, .9,
+                        List.of("命中"), List.of(),
+                        List.of(new ProductReviewResult.RuleRef("PRODUCT-001", "2026-01", "规则", "违禁物品"))),
+                RULES, Map.of("title", "违禁物品", "description", "商品描述"));
     }
 }

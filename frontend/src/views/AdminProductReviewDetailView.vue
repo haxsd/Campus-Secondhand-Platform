@@ -90,7 +90,10 @@ onMounted(load)
             <ul><li v-for="suggestion in aiReview.latestRun.suggestions" :key="suggestion">{{ suggestion }}</li></ul>
           </el-descriptions-item>
           <el-descriptions-item label="Rule Refs" :span="2">
-            {{ aiReview.latestRun.ruleRefs?.map((rule) => `${rule.ruleId}@${rule.ruleVersion}`).join(', ') }}
+            <div v-for="rule in aiReview.latestRun.ruleRefs" :key="`${rule.ruleId}-${rule.ruleVersion}`">
+              {{ rule.title || `${rule.ruleId}@${rule.ruleVersion}` }}
+              <span v-if="rule.evidence">｜证据：{{ rule.evidence }}</span>
+            </div>
           </el-descriptions-item>
         </el-descriptions>
       </el-card>

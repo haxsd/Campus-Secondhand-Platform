@@ -14,6 +14,7 @@ public class ProductReviewProperties {
     private Duration retryBackoff = Duration.ofSeconds(1);
     private int maxRetries = 1;
     private String ruleDomain = "PRODUCT_RULE";
+    private double autoRejectMinConfidence = 0.8;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -31,4 +32,6 @@ public class ProductReviewProperties {
     public void setMaxRetries(int value) { this.maxRetries = value; }
     public String getRuleDomain() { return ruleDomain; }
     public void setRuleDomain(String value) { this.ruleDomain = value; }
+    public double getAutoRejectMinConfidence() { return autoRejectMinConfidence; }
+    public void setAutoRejectMinConfidence(double value) { this.autoRejectMinConfidence = value; }
 }
