@@ -1,5 +1,6 @@
 package com.campus.trade.ai.review;
 
+import com.campus.trade.ai.rule.ProductReviewRule;
 import com.campus.trade.common.context.UserContext;
 import com.campus.trade.common.exception.BizException;
 import com.campus.trade.common.exception.ErrorCode;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Qualifier;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.TimeoutException;
@@ -268,8 +270,8 @@ public class ProductReviewRunService {
     }
 
     private List<ProductReviewResult.RuleRef> enrichRuleRefs(List<ProductReviewResult.RuleRef> refs) {
-        Map<String, com.campus.trade.ai.rule.ProductReviewRule> rules = ruleService.currentRules().stream()
-                .collect(java.util.stream.Collectors.toMap(
+        Map<String, ProductReviewRule> rules = ruleService.currentRules().stream()
+                .collect(Collectors.toMap(
                         rule -> rule.ruleId() + "@" + rule.version(), rule -> rule));
         return refs.stream().map(ref -> {
             var rule = rules.get(ref.ruleId() + "@" + ref.ruleVersion());

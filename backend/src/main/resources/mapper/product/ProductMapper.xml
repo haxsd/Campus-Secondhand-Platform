@@ -251,7 +251,7 @@
           AND deleted = 0
     </update>
 
-    <select id="selectLatestReviewOperatorType" resultType="int">
+    <select id="selectLatestReviewOperatorType" resultType="java.lang.Integer">
         SELECT operator_type
         FROM product_review_log
         WHERE product_id = #{productId}

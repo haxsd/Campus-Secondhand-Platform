@@ -2,6 +2,7 @@ package com.campus.trade.product.controller;
 
 import com.campus.trade.common.response.PageResult;
 import com.campus.trade.common.response.Result;
+import com.campus.trade.ai.review.AdminProductReviewVO;
 import com.campus.trade.ai.review.ProductReviewRunService;
 import com.campus.trade.ai.review.ProductReviewRunVO;
 import com.campus.trade.ai.review.ProductReviewSubmitVO;
@@ -140,7 +141,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}/ai-review")
-    public Result<com.campus.trade.ai.review.AdminProductReviewVO> getSellerAiReview(
+    public Result<AdminProductReviewVO> getSellerAiReview(
             @PathVariable @Min(value = 1, message = "商品 ID 不正确") Long id
     ) {
         return Result.ok(productReviewRunService.getSellerReview(
