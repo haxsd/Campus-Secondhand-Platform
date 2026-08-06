@@ -13,7 +13,7 @@ import java.time.Duration;
 public class DisputeAgentProperties {
     private boolean enabled;
     private String model = "deepseek-v4-flash";
-    private Duration requestTimeout = Duration.ofSeconds(35);
+    private Duration requestTimeout = Duration.ofSeconds(120);
     private Duration staleAfter = Duration.ofMinutes(10);
     private Duration retryBackoff = Duration.ofSeconds(1);
     private int maxRetries = 1;

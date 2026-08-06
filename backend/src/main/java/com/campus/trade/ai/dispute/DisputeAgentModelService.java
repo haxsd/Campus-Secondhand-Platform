@@ -109,7 +109,7 @@ public class DisputeAgentModelService {
             throw failureClassifier.classify(exception);
         }
         if (rawResponse == null || rawResponse.isBlank()) {
-            throw new DisputeAgentOutputInvalidException("模型返回为空");
+            throw new DisputeAgentOutputInvalidException("模型返回为空（ChatClient content=null 或空字符串，未获得模型响应体）");
         }
         try {
             ObjectMapper strictMapper = objectMapper.copy()

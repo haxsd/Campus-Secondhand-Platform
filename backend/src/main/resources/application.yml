@@ -65,7 +65,7 @@ ai:
     enabled: ${AI_REVIEW_ENABLED:false}
     model: ${AI_REVIEW_MODEL:deepseek-v4-flash}
     base-url: ${AI_REVIEW_BASE_URL:https://api.deepseek.com}
-    request-timeout: ${AI_REVIEW_REQUEST_TIMEOUT:35s}
+    request-timeout: ${AI_REVIEW_REQUEST_TIMEOUT:120s}
     stale-after: ${AI_REVIEW_STALE_AFTER:10m}
     retry-backoff: ${AI_REVIEW_RETRY_BACKOFF:1s}
     max-retries: ${AI_REVIEW_MAX_RETRIES:1}
@@ -76,7 +76,7 @@ ai:
   dispute:
     enabled: ${DISPUTE_AI_ENABLED:false}
     model: ${DISPUTE_AI_MODEL:deepseek-v4-flash}
-    request-timeout: ${DISPUTE_AI_REQUEST_TIMEOUT:35s}
+    request-timeout: ${DISPUTE_AI_REQUEST_TIMEOUT:120s}
     stale-after: ${DISPUTE_AI_STALE_AFTER:10m}
     retry-backoff: ${DISPUTE_AI_RETRY_BACKOFF:1s}
     max-retries: ${DISPUTE_AI_MAX_RETRIES:1}
